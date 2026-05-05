@@ -8,7 +8,7 @@ signal download_completed(success: bool)
 
 const CURRENT_VERSION = "1.0.0"
 # Replace this with your actual version JSON URL (e.g., GitHub Raw link)
-const UPDATE_URL = "https://raw.githubusercontent.com/Bugs/Dark-Realm/main/version.json"
+const UPDATE_URL = "https://raw.githubusercontent.com/dent500/Dark-realm/main/version.json"
 const PATCH_DIR = "user://updates/"
 
 var _http_request: HTTPRequest
