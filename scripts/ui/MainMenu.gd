@@ -605,16 +605,13 @@ func _build_preview_config() -> Dictionary:
 	if PlayerData.skin_tone < skin_tones.size(): combined_config["skin_color"] = skin_tones[PlayerData.skin_tone]
 	return {"config": combined_config, "anims": class_anim_config}
 func _on_update_check_finished(has_update: bool, latest_v: String, _url: String) -> void:
+	# Debug print to help us troubleshoot
+	print("[MainMenu] Update Check: HasUpdate=", has_update, " Local=", UpdateManager.CURRENT_VERSION, " Remote=", latest_v)
+	
 	if has_update:
-		_version_lbl.text = "v" + UpdateManager.CURRENT_VERSION + " (Update Available: v" + latest_v + ")"
-		_version_lbl.add_theme_color_override("font_color", Color(0.9, 0.8, 0.4))
+		_version_lbl.text = "v" + UpdateManager.CURRENT_VERSION + " -> New Version v" + latest_v + " Available!"
+		_version_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
 		_update_btn.show()
-		# Add a subtle animation to the update button
-		var tween = create_tween().set_loops()
-		tween.tween_property(_update_btn, "modulate:a", 0.7, 0.8)
-		tween.tween_property(_update_btn, "modulate:a", 1.0, 0.8)
-	else:
-		_version_lbl.text = "v" + UpdateManager.CURRENT_VERSION + " (Up to date)"
 
 func _on_update_pressed() -> void:
 	_update_btn.disabled = true

@@ -6,10 +6,21 @@ signal update_check_completed(has_update: bool, latest_version: String, patch_ur
 signal download_progress(received_bytes: int, total_bytes: int)
 signal download_completed(success: bool)
 
-const CURRENT_VERSION = "1.0.0"
+var CURRENT_VERSION = "1.0.0"
 # Replace this with your actual version JSON URL (e.g., GitHub Raw link)
 const UPDATE_URL = "https://raw.githubusercontent.com/dent500/Dark-realm/main/version.json"
 const PATCH_DIR = "user://updates/"
+
+func _init() -> void:
+	# 1. Load patches as early as possible (before _ready)
+	_load_installed_patches()
+	
+	# 2. Check if a patch provided a newer version.txt
+	if FileAccess.file_exists("res://version.txt"):
+		var f = FileAccess.open("res://version.txt", FileAccess.READ)
+		if f:
+			CURRENT_VERSION = f.get_as_text().strip_edges()
+			print("[UpdateManager] Version overridden by patch: ", CURRENT_VERSION)
 
 var _http_request: HTTPRequest
 var _download_request: HTTPRequest
