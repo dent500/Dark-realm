@@ -1,0 +1,161 @@
+[gd_scene load_steps=17 format=3 uid="uid://player_scene"]
+
+[ext_resource type="Script" path="res://scripts/player/PlayerController.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/combat/CombatSystem.gd" id="2_combat"]
+[ext_resource type="Script" path="res://scripts/inventory/Inventory.gd" id="3_inventory"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_torso"]
+size = Vector3(0.5, 0.7, 0.3)
+
+[sub_resource type="BoxMesh" id="BoxMesh_head"]
+size = Vector3(0.35, 0.35, 0.35)
+
+[sub_resource type="BoxMesh" id="BoxMesh_half_limb"]
+size = Vector3(0.16, 0.45, 0.16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_limb"]
+size = Vector3(0.18, 0.9, 0.18)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sword"]
+size = Vector3(0.05, 0.1, 0.8)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sword"]
+albedo_color = Color(0.7, 0.75, 0.8, 1)
+metallic = 0.9
+roughness = 0.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_skin"]
+albedo_color = Color(0.9, 0.75, 0.6, 1)
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shirt"]
+albedo_color = Color(0.2, 0.3, 0.4, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pants"]
+albedo_color = Color(0.12, 0.1, 0.08, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_hair"]
+size = Vector3(0.4, 0.1, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hair"]
+albedo_color = Color(0.3, 0.15, 0.05, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+radius = 0.04
+height = 0.08
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
+albedo_color = Color(0.1, 0.1, 0.1, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_Armor_Small"]
+size = Vector3(0.25, 0.2, 0.25)
+
+[sub_resource type="StandardMaterial3D" id="Mat_Steel"]
+albedo_color = Color(0.6, 0.62, 0.65, 1)
+metallic = 0.95
+roughness = 0.25
+
+[sub_resource type="BoxMesh" id="Mesh_Belt"]
+size = Vector3(0.52, 0.1, 0.32)
+
+[sub_resource type="StandardMaterial3D" id="Mat_Leather_Dark"]
+albedo_color = Color(0.15, 0.1, 0.05, 1)
+roughness = 0.8
+
+[sub_resource type="CylinderMesh" id="Mesh_Shield"]
+top_radius = 0.35
+bottom_radius = 0.35
+height = 0.04
+
+[sub_resource type="BoxMesh" id="Mesh_Nose"]
+size = Vector3(0.04, 0.08, 0.05)
+
+[sub_resource type="BoxMesh" id="Mesh_Eyebrow"]
+size = Vector3(0.08, 0.02, 0.02)
+
+[sub_resource type="BoxMesh" id="Mesh_Mouth"]
+size = Vector3(0.1, 0.02, 0.02)
+
+[sub_resource type="StandardMaterial3D" id="Mat_Facial_Dark"]
+albedo_color = Color(0.2, 0.12, 0.08, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_anchor"]
+albedo_color = Color(0, 0.5, 1, 1)
+emission_enabled = true
+emission = Color(0, 0.2, 1, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_anchor"]
+material = SubResource("StandardMaterial3D_anchor")
+radius = 0.3
+height = 0.6
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_p1"]
+properties/0/path = NodePath(".:sync_position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:velocity")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:sync_quaternion")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath(".:is_sprinting")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+properties/4/path = NodePath(".:is_blocking")
+properties/4/spawn = true
+properties/4/replication_mode = 1
+properties/5/path = NodePath(".:is_dead")
+properties/5/spawn = true
+properties/5/replication_mode = 1
+properties/6/path = NodePath(".:sync_custom_data")
+properties/6/spawn = true
+properties/6/replication_mode = 1
+
+[node name="Player" type="CharacterBody3D" groups=["player"]]
+floor_max_angle = 1.0472
+floor_snap_length = 0.2
+script = ExtResource("1_player")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_p1")
+
+[node name="Visuals" type="Node3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_player")
+
+[node name="CameraPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot"]
+spring_length = 6.0
+collision_mask = 1
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+current = false
+fov = 75.0
+
+[node name="InteractRay" type="RayCast3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+target_position = Vector3(0, 0, -4)
+enabled = true
+
+[node name="DetectionArea" type="Area3D" parent="."]
+
+[node name="DetectionShape" type="CollisionShape3D" parent="DetectionArea"]
+
+[node name="CombatSystem" type="Node" parent="."]
+script = ExtResource("2_combat")
+
+[node name="Inventory" type="Node" parent="."]
+script = ExtResource("3_inventory")

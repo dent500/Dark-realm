@@ -1,0 +1,309 @@
+[gd_scene load_steps=3 format=3 uid="uid://char_creation"]
+
+[ext_resource type="Script" path="res://scripts/character_creation/CharacterCreation.gd" id="1_cc"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dark"]
+bg_color = Color(0.05, 0.03, 0.1, 0.95)
+border_width_left = 2
+border_width_right = 2
+border_width_top = 2
+border_width_bottom = 2
+border_color = Color(0.4, 0.3, 0.15, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_torso"]
+size = Vector3(0.5, 0.7, 0.3)
+
+[sub_resource type="BoxMesh" id="BoxMesh_head"]
+size = Vector3(0.35, 0.35, 0.35)
+
+[sub_resource type="BoxMesh" id="BoxMesh_limb"]
+size = Vector3(0.18, 0.7, 0.18)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_skin"]
+albedo_color = Color(0.95, 0.8, 0.65, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shirt"]
+albedo_color = Color(0.2, 0.3, 0.4, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pants"]
+albedo_color = Color(0.15, 0.12, 0.1, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_hair"]
+size = Vector3(0.4, 0.1, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hair"]
+albedo_color = Color(0.4, 0.2, 0.1, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+radius = 0.04
+height = 0.08
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
+albedo_color = Color(0.3, 0.5, 0.3, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pedestal"]
+top_radius = 0.8
+bottom_radius = 1.0
+height = 0.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pedestal"]
+albedo_color = Color(0.15, 0.15, 0.18, 1)
+roughness = 0.8
+metallic = 0.3
+
+[sub_resource type="Gradient" id="Gradient_bg"]
+colors = PackedColorArray(0.1, 0.12, 0.18, 1, 0.4, 0.45, 0.55, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_bg"]
+gradient = SubResource("Gradient_bg")
+fill_from = Vector2(0.5, 0)
+fill_to = Vector2(0.5, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_normal"]
+bg_color = Color(0.12, 0.08, 0.06, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 3
+border_color = Color(0.4, 0.3, 0.15, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_hover"]
+bg_color = Color(0.2, 0.12, 0.08, 0.95)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 3
+border_color = Color(0.7, 0.55, 0.3, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_pressed"]
+bg_color = Color(0.08, 0.04, 0.03, 1)
+border_width_left = 1
+border_width_top = 3
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.2, 0.1, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="Theme" id="Theme_dark_fantasy"]
+Button/styles/normal = SubResource("StyleBoxFlat_btn_normal")
+Button/styles/hover = SubResource("StyleBoxFlat_btn_hover")
+Button/styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
+Button/styles/focus = SubResource("StyleBoxFlat_btn_normal")
+Button/colors/font_color = Color(0.85, 0.8, 0.7, 1)
+Button/colors/font_hover_color = Color(1, 0.95, 0.85, 1)
+
+[node name="CharacterCreation" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme = SubResource("Theme_dark_fantasy")
+script = ExtResource("1_cc")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = SubResource("GradientTexture2D_bg")
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 1
+anchor_left = 0.0
+anchor_top = 0.0
+offset_left = 40
+offset_top = 20
+offset_right = 800
+offset_bottom = 60
+text = "CREATE YOUR CHARACTER"
+theme_override_font_sizes/font_size = 32
+theme_override_colors/font_color = Color(0.9, 0.75, 0.3, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchor_left = 0.0
+anchor_right = 0.6
+anchor_top = 0.06
+anchor_bottom = 0.95
+offset_left = 40
+offset_right = -40
+offset_top = 20
+offset_bottom = -20
+theme_override_constants/separation = 20
+
+[node name="NameSection" type="VBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="NameSectionLabel" type="Label" parent="VBoxContainer/NameSection"]
+layout_mode = 2
+text = "CHARACTER NAME"
+theme_override_colors/font_color = Color(0.7, 0.6, 0.4, 1)
+
+[node name="NameInput" type="LineEdit" parent="VBoxContainer/NameSection"]
+layout_mode = 2
+placeholder_text = "Enter your name..."
+custom_minimum_size = Vector2(0, 40)
+
+[node name="RaceSection" type="VBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="RaceSectionLabel" type="Label" parent="VBoxContainer/RaceSection"]
+layout_mode = 2
+text = "CHOOSE RACE"
+theme_override_colors/font_color = Color(0.7, 0.6, 0.4, 1)
+
+[node name="RaceGrid" type="GridContainer" parent="VBoxContainer/RaceSection"]
+layout_mode = 2
+columns = 5
+theme_override_constants/h_separation = 8
+
+[node name="ClassSection" type="VBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="ClassSectionLabel" type="Label" parent="VBoxContainer/ClassSection"]
+layout_mode = 2
+text = "CHOOSE CLASS"
+theme_override_colors/font_color = Color(0.7, 0.6, 0.4, 1)
+
+[node name="ClassGrid" type="GridContainer" parent="VBoxContainer/ClassSection"]
+layout_mode = 2
+columns = 5
+theme_override_constants/h_separation = 8
+
+[node name="StatsSection" type="VBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="StatsSectionLabel" type="Label" parent="VBoxContainer/StatsSection"]
+layout_mode = 2
+text = "ALLOCATE STATS (Point Buy)"
+theme_override_colors/font_color = Color(0.7, 0.6, 0.4, 1)
+
+[node name="PointsLabel" type="Label" parent="VBoxContainer/StatsSection"]
+layout_mode = 2
+text = "Points remaining: 27"
+theme_override_colors/font_color = Color(0.4, 0.9, 0.4, 1)
+
+[node name="StatPanel" type="VBoxContainer" parent="VBoxContainer/StatsSection"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="AppearanceSection" type="VBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="AppearanceSectionLabel" type="Label" parent="VBoxContainer/AppearanceSection"]
+layout_mode = 2
+text = "APPEARANCE"
+theme_override_colors/font_color = Color(0.7, 0.6, 0.4, 1)
+
+[node name="AppearancePanel" type="HBoxContainer" parent="VBoxContainer/AppearanceSection"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="PreviewPanel" type="Panel" parent="."]
+layout_mode = 1
+anchor_left = 0.62
+anchor_right = 1.0
+anchor_top = 0.06
+anchor_bottom = 0.95
+offset_left = 0
+offset_right = -20
+style_override/panel = SubResource("StyleBoxFlat_dark")
+
+[node name="Portrait" type="SubViewportContainer" parent="PreviewPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+stretch = true
+
+[node name="SubViewport" type="SubViewport" parent="PreviewPanel/Portrait"]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(256, 256)
+render_target_update_mode = 4
+
+[node name="Camera3D" type="Camera3D" parent="PreviewPanel/Portrait/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 0.8, 3.2)
+
+[node name="Model" type="Node3D" parent="PreviewPanel/Portrait/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.05, 0)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="PreviewPanel/Portrait/SubViewport"]
+transform = Transform3D(0.866025, -0.25, 0.433013, 0, 0.866025, 0.5, -0.5, -0.433013, 0.75, 0, 2, 2)
+light_energy = 1.2
+
+[node name="Spotlight" type="SpotLight3D" parent="PreviewPanel/Portrait/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 2.5, 2.0)
+light_energy = 3.0
+spot_range = 10.0
+spot_angle = 35.0
+
+[node name="Backlight" type="OmniLight3D" parent="PreviewPanel/Portrait/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, -1.5)
+light_color = Color(1, 0.95, 0.85, 1)
+light_energy = 1.5
+omni_range = 5.0
+
+[node name="Pedestal" type="MeshInstance3D" parent="PreviewPanel/Portrait/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.0, 0)
+mesh = SubResource("CylinderMesh_pedestal")
+material_override = SubResource("StandardMaterial3D_pedestal")
+
+[node name="VBox" type="VBoxContainer" parent="PreviewPanel"]
+layout_mode = 1
+anchor_left = 0.0
+anchor_right = 1.0
+anchor_top = 0.32
+anchor_bottom = 1.0
+offset_left = 16
+offset_right = -16
+theme_override_constants/separation = 12
+
+[node name="LoreLabel" type="Label" parent="PreviewPanel/VBox"]
+layout_mode = 2
+text = "Select a race..."
+autowrap_mode = 3
+theme_override_colors/font_color = Color(0.8, 0.7, 0.55, 1)
+
+[node name="PassiveLabel" type="Label" parent="PreviewPanel/VBox"]
+layout_mode = 2
+text = ""
+autowrap_mode = 3
+theme_override_colors/font_color = Color(0.5, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+
+[node name="ClassLoreLabel" type="Label" parent="PreviewPanel/VBox"]
+layout_mode = 2
+text = "Select a class..."
+autowrap_mode = 3
+theme_override_colors/font_color = Color(0.7, 0.65, 0.85, 1)
+
+[node name="AbilityList" type="VBoxContainer" parent="PreviewPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ConfirmButton" type="Button" parent="."]
+layout_mode = 1
+anchor_left = 0.62
+anchor_right = 1.0
+anchor_top = 0.95
+anchor_bottom = 1.0
+offset_left = 0
+offset_right = -20
+offset_top = 4
+offset_bottom = -8
+text = "⚔  BEGIN YOUR JOURNEY  ⚔"
+theme_override_font_sizes/font_size = 18

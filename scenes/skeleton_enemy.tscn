@@ -1,0 +1,184 @@
+[gd_scene load_steps=13 format=3 uid="uid://enemy_skel1"]
+
+[ext_resource type="Script" path="res://scripts/enemies/EnemyBase.gd" id="1_enemy"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_en"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_en_det2"]
+radius = 12.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_Bone"]
+resource_local_to_scene = true
+albedo_color = Color(0.91, 0.88, 0.82, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="Mat_Glow_Red"]
+albedo_color = Color(1, 0, 0, 1)
+emission_enabled = true
+emission = Color(1, 0, 0, 1)
+emission_energy_multiplier = 3.0
+
+[sub_resource type="BoxMesh" id="Mesh_Torso_Thin"]
+size = Vector3(0.4, 0.7, 0.25)
+
+[sub_resource type="BoxMesh" id="Mesh_Head_Skull"]
+size = Vector3(0.32, 0.35, 0.32)
+
+[sub_resource type="CylinderMesh" id="Mesh_Limb_Bone"]
+top_radius = 0.06
+bottom_radius = 0.06
+height = 0.7
+
+[sub_resource type="BoxMesh" id="Mesh_Sword_Rusty"]
+size = Vector3(0.06, 0.12, 0.9)
+
+[sub_resource type="StandardMaterial3D" id="Mat_Sword_Iron"]
+albedo_color = Color(0.3, 0.3, 0.3, 1)
+metallic = 0.6
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="Mesh_HP_Bg"]
+size = Vector3(1.2, 0.15, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_HP_Bg"]
+albedo_color = Color(0, 0, 0, 1)
+shading_mode = 0
+
+[sub_resource type="BoxMesh" id="Mesh_HP_Fg"]
+size = Vector3(1.2, 0.15, 0.11)
+
+[sub_resource type="StandardMaterial3D" id="Mat_HP_Fg"]
+albedo_color = Color(1.0, 0.1, 0.1, 1)
+shading_mode = 0
+
+[sub_resource type="SphereMesh" id="Mesh_Eye"]
+radius = 0.03
+height = 0.06
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_en1"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:rotation")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:current_hp")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+
+[node name="SkeletonEnemy" type="CharacterBody3D"]
+script = ExtResource("1_enemy")
+enemy_name = "Skeleton Warrior"
+move_speed = 3.6
+attack_damage = 18
+attack_range = 2.5
+detection_range = 14.0
+loot_table = [{
+"chance": 0.8,
+"item": "bone_fragment",
+"max": 2,
+"min": 1
+}, {
+"chance": 0.5,
+"item": "ancient_coin",
+"max": 3,
+"min": 1
+}, {
+"chance": 0.15,
+"item": "soul_essence",
+"max": 1,
+"min": 1
+}, {
+"chance": 0.02,
+"item": "relic_of_old",
+"max": 1,
+"min": 1
+}]
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_en1")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_en")
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
+avoidance_enabled = true
+
+[node name="DetectionArea" type="Area3D" parent="."]
+collision_mask = 3
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionArea"]
+shape = SubResource("SphereShape3D_en_det2")
+
+[node name="HealthBar3D" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0)
+
+[node name="Bg" type="MeshInstance3D" parent="HealthBar3D"]
+mesh = SubResource("Mesh_HP_Bg")
+material_override = SubResource("Mat_HP_Bg")
+
+[node name="Fg" type="MeshInstance3D" parent="HealthBar3D"]
+mesh = SubResource("Mesh_HP_Fg")
+material_override = SubResource("Mat_HP_Fg")
+
+[node name="EnemyMesh" type="Node3D" parent="."]
+
+[node name="Torso" type="MeshInstance3D" parent="EnemyMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
+mesh = SubResource("Mesh_Torso_Thin")
+material_override = SubResource("Mat_Bone")
+
+[node name="Head" type="MeshInstance3D" parent="EnemyMesh/Torso"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.525, 0)
+mesh = SubResource("Mesh_Head_Skull")
+material_override = SubResource("Mat_Bone")
+
+[node name="LEye" type="MeshInstance3D" parent="EnemyMesh/Torso/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.08, 0.05, -0.16)
+mesh = SubResource("Mesh_Eye")
+material_override = SubResource("Mat_Glow_Red")
+
+[node name="REye" type="MeshInstance3D" parent="EnemyMesh/Torso/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.08, 0.05, -0.16)
+mesh = SubResource("Mesh_Eye")
+material_override = SubResource("Mat_Glow_Red")
+
+[node name="LeftArmPivot" type="Node3D" parent="EnemyMesh/Torso"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25, 0.25, 0)
+
+[node name="LeftArm" type="MeshInstance3D" parent="EnemyMesh/Torso/LeftArmPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
+mesh = SubResource("Mesh_Limb_Bone")
+material_override = SubResource("Mat_Bone")
+
+[node name="RightArmPivot" type="Node3D" parent="EnemyMesh/Torso"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 0.25, 0)
+
+[node name="RightArm" type="MeshInstance3D" parent="EnemyMesh/Torso/RightArmPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
+mesh = SubResource("Mesh_Limb_Bone")
+material_override = SubResource("Mat_Bone")
+
+[node name="Weapon" type="MeshInstance3D" parent="EnemyMesh/Torso/RightArmPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.65, -0.45)
+mesh = SubResource("Mesh_Sword_Rusty")
+material_override = SubResource("Mat_Sword_Iron")
+
+[node name="LeftLegPivot" type="Node3D" parent="EnemyMesh/Torso"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, -0.35, 0)
+
+[node name="LeftLeg" type="MeshInstance3D" parent="EnemyMesh/Torso/LeftLegPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
+mesh = SubResource("Mesh_Limb_Bone")
+material_override = SubResource("Mat_Bone")
+
+[node name="RightLegPivot" type="Node3D" parent="EnemyMesh/Torso"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.12, -0.35, 0)
+
+[node name="RightLeg" type="MeshInstance3D" parent="EnemyMesh/Torso/RightLegPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
+mesh = SubResource("Mesh_Limb_Bone")
+material_override = SubResource("Mat_Bone")

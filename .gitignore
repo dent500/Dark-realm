@@ -1,0 +1,17 @@
+# Godot-specific ignores
+.godot/
+*.tmp
+*.log
+*.import
+
+# Build and Tooling
+build/
+installer/*.exe
+tools_and_temp/
+video Recording/
+scratch/
+tmp/
+
+# System-specific
+.DS_Store
+Thumbs.db

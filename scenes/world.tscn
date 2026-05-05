@@ -1,0 +1,160 @@
+[gd_scene load_steps=17 format=3 uid="uid://world_scene"]
+
+[ext_resource type="Script" path="res://scripts/world/WorldManager.gd" id="1_world"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
+[ext_resource type="Script" path="res://scripts/ui/HUD.gd" id="3_hud_script"]
+[ext_resource type="PackedScene" path="res://scenes/skeleton_enemy.tscn" id="4_enemy"]
+[ext_resource type="Script" path="res://scripts/world/WaveManager.gd" id="7_wave_mgr"]
+[ext_resource type="Script" path="res://scripts/world/DungeonDoor.gd" id="8_door"]
+[ext_resource type="Script" path="res://scripts/world/MapLoader.gd" id="9_loader"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_world"]
+sky_top_color = Color(0.384314, 0.454902, 0.54902, 1)
+sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+sky_curve = 0.15
+ground_bottom_color = Color(0.2, 0.16, 0.1, 1)
+
+[sub_resource type="Sky" id="Sky_world"]
+sky_material = SubResource("ProceduralSkyMaterial_world")
+
+[sub_resource type="Environment" id="Environment_world"]
+background_mode = 2
+sky = SubResource("Sky_world")
+ambient_light_source = 2
+ambient_light_color = Color(0.7, 0.75, 0.85, 1)
+ambient_light_energy = 1.2
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(0.6, 0.7, 0.8, 1)
+fog_density = 0.0005
+fog_sky_affect = 0.5
+
+
+[sub_resource type="NavigationMesh" id="NavigationMesh_world"]
+agent_radius = 0.4
+
+[sub_resource type="SphereMesh" id="SphereMesh_rock"]
+radial_segments = 16
+rings = 8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rock"]
+albedo_color = Color(0.18, 0.18, 0.2, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pillar"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 2.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ruin"]
+albedo_color = Color(0.25, 0.25, 0.26, 1)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_tree"]
+top_radius = 0.2
+bottom_radius = 0.4
+height = 4.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tree"]
+albedo_color = Color(0.12, 0.08, 0.05, 1)
+roughness = 0.95
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="SphereShape3D" id="SphereShape_rock"]
+radius = 0.5
+
+[sub_resource type="CylinderShape3D" id="CylinderShape_pillar"]
+height = 2.0
+radius = 0.5
+
+[sub_resource type="CylinderShape3D" id="CylinderShape_tree"]
+height = 4.0
+radius = 0.35
+
+[sub_resource type="BoxShape3D" id="BoxShape_wall"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dungeon_floor"]
+albedo_color = Color(0.15, 0.12, 0.1, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dungeon_wall"]
+albedo_color = Color(0.22, 0.2, 0.22, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_dfloor"]
+size = Vector3(14, 0.4, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_dfloor"]
+size = Vector3(14, 0.4, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_dceil"]
+size = Vector3(14, 0.4, 16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_dwallN"]
+size = Vector3(14, 5, 0.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_dwallN"]
+size = Vector3(14, 5, 0.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_dwallEW"]
+size = Vector3(0.4, 5, 16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_dwallEW"]
+size = Vector3(0.4, 5, 16)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_door"]
+radius = 2.5
+
+[node name="World" type="Node3D"]
+script = ExtResource("1_world")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-45, 30, 0)
+light_color = Color(1.0, 0.9, 0.7, 1)
+light_energy = 3.0
+shadow_enabled = true
+
+[node name="AmbientLight" type="OmniLight3D" parent="."]
+position = Vector3(0, 50, 0)
+light_energy = 0.8
+omni_range = 500.0
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+navigation_mesh = SubResource("NavigationMesh_world")
+
+
+[node name="SpawnPoint" type="Node3D" parent="."]
+position = Vector3(0, 1, 0)
+
+[node name="SpawnMarker" type="Marker3D" parent="SpawnPoint"]
+
+[node name="Players" type="Node3D" parent="."]
+
+
+
+
+
+[node name="HUDCanvas" type="CanvasLayer" parent="."]
+
+[node name="HUD" type="Control" parent="HUDCanvas"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("3_hud_script")
+
+
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_world")
+
+[node name="MapLoader" type="Node3D" parent="."]
+
+
+
+script = ExtResource("9_loader")
+enemy_scene = ExtResource("4_enemy")

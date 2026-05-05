@@ -1,0 +1,316 @@
+[gd_scene load_steps=15 format=3 uid="uid://player_scene"]
+
+[ext_resource type="Script" path="res://scripts/player/PlayerController.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/combat/CombatSystem.gd" id="2_combat"]
+[ext_resource type="Script" path="res://scripts/inventory/Inventory.gd" id="3_inventory"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_torso"]
+size = Vector3(0.5, 0.7, 0.3)
+
+[sub_resource type="BoxMesh" id="BoxMesh_head"]
+size = Vector3(0.35, 0.35, 0.35)
+
+[sub_resource type="BoxMesh" id="BoxMesh_half_limb"]
+size = Vector3(0.16, 0.45, 0.16)
+
+[sub_resource type="BoxMesh" id="BoxMesh_limb"]
+size = Vector3(0.18, 0.9, 0.18)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sword"]
+size = Vector3(0.05, 0.1, 0.8)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sword"]
+albedo_color = Color(0.7, 0.75, 0.8, 1)
+metallic = 0.9
+roughness = 0.2
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_skin"]
+albedo_color = Color(0.9, 0.75, 0.6, 1)
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shirt"]
+albedo_color = Color(0.2, 0.3, 0.4, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pants"]
+albedo_color = Color(0.12, 0.1, 0.08, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_hair"]
+size = Vector3(0.4, 0.1, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hair"]
+albedo_color = Color(0.3, 0.15, 0.05, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_eye"]
+radius = 0.04
+height = 0.08
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_eye"]
+albedo_color = Color(0.1, 0.1, 0.1, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_Armor_Small"]
+size = Vector3(0.25, 0.2, 0.25)
+
+[sub_resource type="StandardMaterial3D" id="Mat_Steel"]
+albedo_color = Color(0.6, 0.62, 0.65, 1)
+metallic = 0.95
+roughness = 0.25
+
+[sub_resource type="BoxMesh" id="Mesh_Belt"]
+size = Vector3(0.52, 0.1, 0.32)
+
+[sub_resource type="StandardMaterial3D" id="Mat_Leather_Dark"]
+albedo_color = Color(0.15, 0.1, 0.05, 1)
+roughness = 0.8
+
+[sub_resource type="CylinderMesh" id="Mesh_Shield"]
+top_radius = 0.35
+bottom_radius = 0.35
+height = 0.04
+
+[sub_resource type="BoxMesh" id="Mesh_Nose"]
+size = Vector3(0.04, 0.08, 0.05)
+
+[sub_resource type="BoxMesh" id="Mesh_Eyebrow"]
+size = Vector3(0.08, 0.02, 0.02)
+
+[sub_resource type="BoxMesh" id="Mesh_Mouth"]
+size = Vector3(0.1, 0.02, 0.02)
+
+[sub_resource type="StandardMaterial3D" id="Mat_Facial_Dark"]
+albedo_color = Color(0.2, 0.12, 0.08, 1)
+roughness = 0.9
+
+[node name="Player" type="CharacterBody3D" groups=["player"]]
+floor_max_angle = 1.0472
+floor_snap_length = 0.2
+script = ExtResource("1_player")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_player")
+
+[node name="PlayerMesh" type="Node3D" parent="."]
+
+[node name="Hips" type="MeshInstance3D" parent="PlayerMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
+mesh = SubResource("BoxMesh_torso")
+material_override = SubResource("StandardMaterial3D_shirt")
+
+[node name="Belt" type="MeshInstance3D" parent="PlayerMesh/Hips"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
+visible = false
+mesh = SubResource("Mesh_Belt")
+material_override = SubResource("Mat_Leather_Dark")
+
+[node name="Spine" type="Node3D" parent="PlayerMesh/Hips"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+
+[node name="Spine1" type="Node3D" parent="PlayerMesh/Hips/Spine"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+
+[node name="Spine2" type="Node3D" parent="PlayerMesh/Hips/Spine/Spine1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+
+[node name="Neck" type="Node3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+
+[node name="Head" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/Neck"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.125, 0)
+mesh = SubResource("BoxMesh_head")
+material_override = SubResource("StandardMaterial3D_skin")
+
+[node name="Hair" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/Neck/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 0)
+mesh = SubResource("BoxMesh_hair")
+material_override = SubResource("StandardMaterial3D_hair")
+
+[node name="LeftEye" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/Neck/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.08, 0.05, -0.18)
+mesh = SubResource("SphereMesh_eye")
+material_override = SubResource("StandardMaterial3D_eye")
+
+[node name="RightEye" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/Neck/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.08, 0.05, -0.18)
+mesh = SubResource("SphereMesh_eye")
+material_override = SubResource("StandardMaterial3D_eye")
+
+[node name="Nose" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/Neck/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, -0.19)
+mesh = SubResource("Mesh_Nose")
+material_override = SubResource("StandardMaterial3D_skin")
+
+[node name="EyebrowL" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/Neck/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.08, 0.12, -0.18)
+mesh = SubResource("Mesh_Eyebrow")
+material_override = SubResource("Mat_Facial_Dark")
+
+[node name="EyebrowR" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/Neck/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.08, 0.12, -0.18)
+mesh = SubResource("Mesh_Eyebrow")
+material_override = SubResource("Mat_Facial_Dark")
+
+[node name="Mouth" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/Neck/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.12, -0.18)
+mesh = SubResource("Mesh_Mouth")
+material_override = SubResource("Mat_Facial_Dark")
+
+[node name="LeftShoulder" type="Node3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 0, 0)
+
+[node name="LeftArm" type="Node3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/LeftShoulder"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.24, -0.05, 0)
+
+[node name="Pauldrons" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+visible = false
+mesh = SubResource("Mesh_Armor_Small")
+material_override = SubResource("Mat_Steel")
+
+[node name="UpperArm" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.225, 0)
+mesh = SubResource("BoxMesh_half_limb")
+material_override = SubResource("StandardMaterial3D_skin")
+
+[node name="LeftForeArm" type="Node3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.45, 0)
+
+[node name="LowerArm" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm/LeftForeArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.225, 0)
+mesh = SubResource("BoxMesh_half_limb")
+material_override = SubResource("StandardMaterial3D_skin")
+
+[node name="Shield" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm/LeftForeArm"]
+transform = Transform3D(-4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0, 1, -0.1, -0.3, 0)
+visible = false
+mesh = SubResource("Mesh_Shield")
+material_override = SubResource("Mat_Steel")
+
+[node name="LeftHand" type="Node3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm/LeftForeArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.45, 0)
+
+[node name="HandMesh" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm/LeftForeArm/LeftHand"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+mesh = SubResource("Mesh_Armor_Small")
+material_override = SubResource("Mat_Leather_Dark")
+
+[node name="RightShoulder" type="Node3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, 0)
+
+[node name="RightArm" type="Node3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/RightShoulder"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.24, -0.05, 0)
+
+[node name="Pauldrons" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+visible = false
+mesh = SubResource("Mesh_Armor_Small")
+material_override = SubResource("Mat_Steel")
+
+[node name="UpperArm" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.225, 0)
+mesh = SubResource("BoxMesh_half_limb")
+material_override = SubResource("StandardMaterial3D_skin")
+
+[node name="RightForeArm" type="Node3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.45, 0)
+
+[node name="LowerArm" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm/RightForeArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.225, 0)
+mesh = SubResource("BoxMesh_half_limb")
+material_override = SubResource("StandardMaterial3D_skin")
+
+[node name="RightHand" type="Node3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm/RightForeArm"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.45, 0)
+
+[node name="HandMesh" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm/RightForeArm/RightHand"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+mesh = SubResource("Mesh_Armor_Small")
+material_override = SubResource("Mat_Leather_Dark")
+
+[node name="Weapon" type="MeshInstance3D" parent="PlayerMesh/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm/RightForeArm/RightHand"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.4)
+visible = false
+mesh = SubResource("BoxMesh_sword")
+material_override = SubResource("StandardMaterial3D_sword")
+
+[node name="LeftUpLeg" type="Node3D" parent="PlayerMesh/Hips"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, -0.35, 0)
+
+[node name="UpperLeg" type="MeshInstance3D" parent="PlayerMesh/Hips/LeftUpLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.225, 0)
+mesh = SubResource("BoxMesh_half_limb")
+material_override = SubResource("StandardMaterial3D_pants")
+
+[node name="LeftLeg" type="Node3D" parent="PlayerMesh/Hips/LeftUpLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.45, 0)
+
+[node name="LowerLeg" type="MeshInstance3D" parent="PlayerMesh/Hips/LeftUpLeg/LeftLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.225, 0)
+mesh = SubResource("BoxMesh_half_limb")
+material_override = SubResource("StandardMaterial3D_pants")
+
+[node name="LeftFoot" type="Node3D" parent="PlayerMesh/Hips/LeftUpLeg/LeftLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.45, 0)
+
+[node name="Boots" type="MeshInstance3D" parent="PlayerMesh/Hips/LeftUpLeg/LeftLeg/LeftFoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, -0.05)
+visible = false
+mesh = SubResource("Mesh_Armor_Small")
+material_override = SubResource("Mat_Leather_Dark")
+
+[node name="RightUpLeg" type="Node3D" parent="PlayerMesh/Hips"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, -0.35, 0)
+
+[node name="UpperLeg" type="MeshInstance3D" parent="PlayerMesh/Hips/RightUpLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.225, 0)
+mesh = SubResource("BoxMesh_half_limb")
+material_override = SubResource("StandardMaterial3D_pants")
+
+[node name="RightLeg" type="Node3D" parent="PlayerMesh/Hips/RightUpLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.45, 0)
+
+[node name="LowerLeg" type="MeshInstance3D" parent="PlayerMesh/Hips/RightUpLeg/RightLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.225, 0)
+mesh = SubResource("BoxMesh_half_limb")
+material_override = SubResource("StandardMaterial3D_pants")
+
+[node name="RightFoot" type="Node3D" parent="PlayerMesh/Hips/RightUpLeg/RightLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.45, 0)
+
+[node name="Boots" type="MeshInstance3D" parent="PlayerMesh/Hips/RightUpLeg/RightLeg/RightFoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, -0.05)
+visible = false
+mesh = SubResource("Mesh_Armor_Small")
+material_override = SubResource("Mat_Leather_Dark")
+
+[node name="CameraPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot"]
+spring_length = 6.0
+collision_mask = 1
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.5, 0)
+current = true
+fov = 70.0
+
+[node name="InteractRay" type="RayCast3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+target_position = Vector3(0, 0, -4)
+enabled = true
+
+[node name="DetectionArea" type="Area3D" parent="."]
+
+[node name="DetectionShape" type="CollisionShape3D" parent="DetectionArea"]
+
+[node name="CombatSystem" type="Node" parent="."]
+script = ExtResource("2_combat")
+
+[node name="Inventory" type="Node" parent="."]
+script = ExtResource("3_inventory")
