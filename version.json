@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
-  "patch_url": "",
-  "notes": "Initial release with OTA Update System and Steam Multiplayer integration."
+  "version": "1.0.1",
+  "patch_url": "https://github.com/dent500/Dark-realm/releases/download/v1.0.1/patch_v1.0.1.pck",
+  "notes": "Removed the large grey platform from the environment."
 }

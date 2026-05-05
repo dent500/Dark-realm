@@ -117,22 +117,6 @@ func _generate_terrain() -> void:
 	# Water
 	_create_water()
 	
-	# Emergency Base for visibility
-	var base = MeshInstance3D.new()
-	var box = BoxMesh.new(); box.size = Vector3(40, 1, 40)
-	var mat_base = StandardMaterial3D.new()
-	mat_base.albedo_color = Color(0.2, 0.2, 0.2) # Neutral dark stone
-	base.mesh = box; base.material_override = mat_base
-	base.position = Vector3(30, 8.0, -20) # Spawn point height
-	add_child(base)
-	
-	# Add actual collision to the base so players don't fall
-	var base_sb = StaticBody3D.new()
-	var base_cs = CollisionShape3D.new()
-	var base_shape = BoxShape3D.new(); base_shape.size = Vector3(20, 1, 20)
-	base_cs.shape = base_shape
-	base_sb.add_child(base_cs)
-	base.add_child(base_sb)
 
 	# Generate 2D Map Texture for HUD
 	_generate_map_texture()
