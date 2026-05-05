@@ -12,14 +12,19 @@ const UPDATE_URL = "https://raw.githubusercontent.com/dent500/Dark-realm/main/ve
 const PATCH_DIR = "user://updates/"
 
 func _init() -> void:
-	# 1. Load patches as early as possible (before _ready)
+	# 1. Ensure patch directory exists before we try to load from it
+	var absolute_patch_dir = ProjectSettings.globalize_path(PATCH_DIR)
+	if not DirAccess.dir_exists_absolute(absolute_patch_dir):
+		DirAccess.make_dir_absolute(absolute_patch_dir)
+		
+	# 2. Load patches as early as possible (before _ready)
 	_load_installed_patches()
 	
-	# 2. Check if a patch provided a newer version.txt
+	# 3. Check if a patch provided a newer version.txt
 	if FileAccess.file_exists("res://version.txt"):
 		var f = FileAccess.open("res://version.txt", FileAccess.READ)
 		if f:
-			CURRENT_VERSION = f.get_as_text().strip_edges()
+			CURRENT_VERSION = f.get_as_text().strip_edges().replace(" ", "")
 			print("[UpdateManager] Version overridden by patch: ", CURRENT_VERSION)
 
 var _http_request: HTTPRequest
@@ -29,14 +34,7 @@ var latest_version_info: Dictionary = {}
 var is_update_available: bool = false
 
 func _ready() -> void:
-	# 1. Ensure patch directory exists
-	if not DirAccess.dir_exists_absolute(PATCH_DIR):
-		DirAccess.make_dir_absolute(PATCH_DIR)
-	
-	# 2. Load existing patches immediately on startup
-	_load_installed_patches()
-	
-	# 3. Setup HTTP nodes
+	# Setup HTTP nodes
 	_http_request = HTTPRequest.new()
 	add_child(_http_request)
 	_http_request.request_completed.connect(_on_update_check_request_completed)
@@ -51,19 +49,20 @@ func _ready() -> void:
 
 ## Loops through the user patch directory and loads any .pck files found.
 func _load_installed_patches() -> void:
-	var dir = DirAccess.open(PATCH_DIR)
+	var absolute_patch_dir = ProjectSettings.globalize_path(PATCH_DIR)
+	var dir = DirAccess.open(absolute_patch_dir)
 	if dir:
 		dir.list_dir_begin()
 		var file_name = dir.get_next()
 		while file_name != "":
 			if not dir.current_is_dir() and file_name.ends_with(".pck"):
-				var patch_path = PATCH_DIR + file_name
-				print("[UpdateManager] Loading patch: ", patch_path)
+				var patch_path = absolute_patch_dir + file_name
+				print("[UpdateManager] Attempting to load patch at: ", patch_path)
 				var success = ProjectSettings.load_resource_pack(patch_path)
 				if success:
-					print("[UpdateManager] Patch loaded successfully!")
+					print("[UpdateManager] Patch LOADED SUCCESSFULLY from: ", patch_path)
 				else:
-					print("[UpdateManager] Failed to load patch: ", patch_path)
+					printerr("[UpdateManager] FAILED to load patch from: ", patch_path)
 			file_name = dir.get_next()
 
 func check_for_updates() -> void:
@@ -82,11 +81,11 @@ func _on_update_check_request_completed(result: int, response_code: int, _header
 	var json = JSON.parse_string(body.get_string_from_utf8())
 	if json and json is Dictionary:
 		latest_version_info = json
-		var latest_v = json.get("version", CURRENT_VERSION)
+		var latest_v = json.get("version", CURRENT_VERSION).strip_edges().replace(" ", "")
 		var patch_url = json.get("patch_url", "")
 		
 		is_update_available = _is_version_newer(latest_v, CURRENT_VERSION)
-		print("[UpdateManager] Latest Version: ", latest_v, " (Available: ", is_update_available, ")")
+		print("[UpdateManager] Comparison: '", latest_v, "' vs '", CURRENT_VERSION, "' -> UpdateAvailable: ", is_update_available)
 		update_check_completed.emit(is_update_available, latest_v, patch_url)
 	else:
 		print("[UpdateManager] Failed to parse version JSON.")
@@ -110,7 +109,10 @@ func download_patch(url: String) -> void:
 
 func _on_download_completed(result: int, response_code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
 	var success = (result == HTTPRequest.RESULT_SUCCESS and response_code == 200)
-	print("[UpdateManager] Download finished. Success: ", success)
+	if not success:
+		printerr("[UpdateManager] Download FAILED! Result: ", result, " HTTP Code: ", response_code)
+	else:
+		print("[UpdateManager] Download SUCCESS!")
 	download_completed.emit(success)
 
 func _is_version_newer(latest: String, current: String) -> bool:

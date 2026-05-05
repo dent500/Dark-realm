@@ -16,10 +16,10 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 config/name="Dark Realm"
 config/description="A dark fantasy 3D RPG with AI-driven storytelling, open world exploration, and deep character progression."
-run/main_scene="res://scenes/main_menu.tscn"
+run/main_scene="res://scenes/Bootstrap.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://assets/branding/icon.svg"
-config/run/main_scene="res://scenes/main_menu.tscn"
+config/run/main_scene="res://scenes/Bootstrap.tscn"
 
 [autoload]
 
