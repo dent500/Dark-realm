@@ -564,6 +564,7 @@ func _on_connection_fail() -> void:
 
 func _on_lobby_id_received(l_id: int) -> void:
 	_status_lbl.text = "Lobby Created! ID: " + str(l_id)
+	
 	var copy_btn = _create_menu_button("📋 Copy Lobby ID", Color(0.1, 0.4, 0.2))
 	copy_btn.custom_minimum_size = Vector2(0, 45)
 	copy_btn.pressed.connect(func(): 
@@ -573,12 +574,20 @@ func _on_lobby_id_received(l_id: int) -> void:
 	_character_ui.add_child(copy_btn)
 	_character_ui.move_child(copy_btn, _character_ui.get_child_count() - 3)
 	
-	# If we are the host, enter the world immediately
+	# Add a manual "Enter World" button
+	var enter_btn = _create_menu_button("🚀 Enter World", Color(0.2, 0.5, 0.8))
+	enter_btn.custom_minimum_size = Vector2(0, 50)
+	enter_btn.pressed.connect(func(): 
+		_status_lbl.text = "Loading world..."
+		GameManager.enter_world()
+	)
+	_character_ui.add_child(enter_btn)
+	_character_ui.move_child(enter_btn, _character_ui.get_child_count() - 3)
+	
+	# If we are the host, update status
 	if is_hosting_attempt:
 		is_hosting_attempt = false
-		_status_lbl.text = "Lobby Ready! Entering world..."
-		await get_tree().create_timer(1.0).timeout
-		GameManager.enter_world()
+		_status_lbl.text = "Lobby Ready! Click 'Enter World' to start."
 
 func _on_delete_confirmed() -> void:
 	SaveSystem.delete_save(_selected_slot)
