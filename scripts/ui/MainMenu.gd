@@ -566,34 +566,30 @@ func _on_lobby_id_received(l_id: int) -> void:
 	print("[DEBUG] LOBBY READY: ", l_id, " | Hosting: ", is_hosting_attempt)
 	_status_lbl.text = "Lobby Created! ID: " + str(l_id)
 	
-	# Add the "Enter World" button to the main character UI
-	var enter_btn = _create_menu_button("🚀 ENTER WORLD", Color(0.2, 0.7, 0.4))
-	enter_btn.custom_minimum_size = Vector2(300, 80) # HUGE button
-	enter_btn.name = "EnterWorldButton"
+	# Add the "Enter World" button to the bottom area
+	var enter_btn = _create_menu_button("🚀 ENTER WORLD", Color(0.2, 0.5, 0.3))
+	enter_btn.custom_minimum_size = Vector2(0, 50)
 	enter_btn.pressed.connect(func(): 
 		_status_lbl.text = "Entering world..."
 		GameManager.enter_world()
 	)
-	
-	# Put it at the VERY TOP of the character UI so it's always visible
 	_character_ui.add_child(enter_btn)
-	_character_ui.move_child(enter_btn, 0)
-	enter_btn.show()
+	# Move it to just above the "Back to Menu" button (which is usually the last child)
+	_character_ui.move_child(enter_btn, _character_ui.get_child_count() - 2)
 	
 	# Add the Copy button below it
 	var copy_btn = _create_menu_button("📋 Copy Lobby ID", Color(0.3, 0.3, 0.3))
-	copy_btn.custom_minimum_size = Vector2(300, 50)
+	copy_btn.custom_minimum_size = Vector2(0, 40)
 	copy_btn.pressed.connect(func(): 
 		DisplayServer.clipboard_set(str(l_id))
 		copy_btn.text = "✅ ID Copied!"
 	)
 	_character_ui.add_child(copy_btn)
-	_character_ui.move_child(copy_btn, 1)
-	copy_btn.show()
+	_character_ui.move_child(copy_btn, _character_ui.get_child_count() - 2)
 	
 	if is_hosting_attempt:
 		is_hosting_attempt = false
-		_status_lbl.text = "LOBBY READY! CLICK THE LARGE GREEN BUTTON ABOVE."
+		_status_lbl.text = "Lobby Ready! Use the buttons below to start."
 
 func _on_delete_confirmed() -> void:
 	SaveSystem.delete_save(_selected_slot)
