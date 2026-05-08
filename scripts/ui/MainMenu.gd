@@ -21,6 +21,7 @@ enum GameMode { SINGLE, MULTI }
 
 var _current_state: MenuState = MenuState.LAUNCHER
 var _current_mode: GameMode = GameMode.SINGLE
+var is_hosting_attempt: bool = false
 
 # UI Containers
 var _launcher_ui: VBoxContainer
@@ -522,22 +523,12 @@ func _on_host_pressed() -> void:
 		
 	SaveSystem.load_game(_selected_slot)
 	
-	# Connect to lobby_id_received to know when we are ready to enter
-	if not NetworkManager.lobby_id_received.is_connected(_on_host_lobby_ready):
-		NetworkManager.lobby_id_received.connect(_on_host_lobby_ready)
-		
+	is_hosting_attempt = true
 	var err = NetworkManager.host_game()
 	if err == OK:
 		_status_lbl.text = "Creating Steam Lobby..."
 
-func _on_host_lobby_ready(_id: int) -> void:
-	# Disconnect so we don't trigger this again if something else happens
-	if NetworkManager.lobby_id_received.is_connected(_on_host_lobby_ready):
-		NetworkManager.lobby_id_received.disconnect(_on_host_lobby_ready)
-	
-	_status_lbl.text = "Lobby Ready! Entering world..."
-	await get_tree().create_timer(1.0).timeout
-	GameManager.enter_world()
+# This is now handled within _on_lobby_id_received for reliability
 
 func _on_join_pressed() -> void:
 	var slot_data = _podiums_data[_selected_slot]
@@ -581,6 +572,13 @@ func _on_lobby_id_received(l_id: int) -> void:
 	)
 	_character_ui.add_child(copy_btn)
 	_character_ui.move_child(copy_btn, _character_ui.get_child_count() - 3)
+	
+	# If we are the host, enter the world immediately
+	if is_hosting_attempt:
+		is_hosting_attempt = false
+		_status_lbl.text = "Lobby Ready! Entering world..."
+		await get_tree().create_timer(1.0).timeout
+		GameManager.enter_world()
 
 func _on_delete_confirmed() -> void:
 	SaveSystem.delete_save(_selected_slot)
