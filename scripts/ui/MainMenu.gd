@@ -243,7 +243,8 @@ func _integrate_ui_to_main_vbox() -> void:
 
 	# --- Update UI ---
 	_version_lbl = Label.new()
-	_version_lbl.text = "v" + UpdateManager.CURRENT_VERSION
+	var internal_v = FileAccess.get_file_as_string("res://version.txt").strip_edges()
+	_version_lbl.text = "v" + internal_v
 	_version_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_version_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 	_version_lbl.add_theme_font_size_override("font_size", 14)

@@ -21,6 +21,7 @@ func _init():
 		"scripts/ui/HUD.gd",
 		"scripts/world/WorldManager.gd",
 		"scripts/world/TerrainGenerator.gd",
+		"scripts/player/Controller.gd", # Wait, is it PlayerController.gd?
 		"scripts/player/PlayerController.gd",
 		"scripts/autoloads/PlayerData.gd",
 		"scripts/autoloads/SaveSystem.gd",

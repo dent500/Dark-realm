@@ -71,33 +71,47 @@ func _process(_delta: float) -> void:
 
 ## Loops through the user patch directory and loads any .pck files found.
 func _load_installed_patches() -> void:
-	if OS.has_feature("editor"):
-		print("[UpdateManager] Blocked manual patch load: Editor detected.")
+	var log_file = FileAccess.open("user://update_log.txt", FileAccess.WRITE)
+	log_file.store_line("--- Update Log Started at " + Time.get_datetime_string_from_system() + " ---")
+	
+	if not DirAccess.dir_exists_absolute(PATCH_DIR):
+		log_file.store_line("[UpdateManager] No updates folder found at " + PATCH_DIR)
 		return
+
+	var dir = DirAccess.open(PATCH_DIR)
+	if not dir:
+		log_file.store_line("[UpdateManager] Failed to open updates folder!")
+		return
+
+	dir.list_dir_begin()
+	var patch_files = []
+	var file_name = dir.get_next()
+	while file_name != "":
+		if not dir.current_is_dir() and file_name.ends_with(".pck"):
+			patch_files.append(file_name)
+		file_name = dir.get_next()
+	
+	# Sort patches alphabetically to ensure newest (v1.0.2) overrides older ones
+	patch_files.sort()
+	log_file.store_line("[UpdateManager] Found " + str(patch_files.size()) + " patches: " + str(patch_files))
+
+	for patch in patch_files:
+		var patch_path = PATCH_DIR + patch
+		var absolute_path = ProjectSettings.globalize_path(patch_path)
+		log_file.store_line("[UpdateManager] Attempting to load: " + absolute_path)
 		
-	var absolute_patch_dir = ProjectSettings.globalize_path(PATCH_DIR)
-	var dir = DirAccess.open(absolute_patch_dir)
-	if dir:
-		var patch_files = []
-		dir.list_dir_begin()
-		var file_name = dir.get_next()
-		while file_name != "":
-			if not dir.current_is_dir() and file_name.ends_with(".pck"):
-				patch_files.append(file_name)
-			file_name = dir.get_next()
-		
-		# Sort patches alphabetically (v1.0.1 before v1.0.2)
-		# This ensures newer versions overwrite older ones in the virtual filesystem.
-		patch_files.sort()
-		
-		for patch_name in patch_files:
-			var patch_path = absolute_patch_dir + patch_name
-			print("[UpdateManager] Attempting to load patch at: ", patch_path)
-			var success = ProjectSettings.load_resource_pack(patch_path)
-			if success:
-				print("[UpdateManager] Patch LOADED SUCCESSFULLY from: ", patch_path)
-			else:
-				printerr("[UpdateManager] FAILED to load patch from: ", patch_path)
+		var success = ProjectSettings.load_resource_pack(patch_path)
+		if success:
+			log_file.store_line("[UpdateManager] SUCCESS: Loaded " + patch)
+			# Verify if version.txt was updated by the pack
+			if FileAccess.file_exists("res://version.txt"):
+				var v = FileAccess.get_file_as_string("res://version.txt").strip_edges()
+				log_file.store_line("[UpdateManager] Patch internal version: " + v)
+		else:
+			log_file.store_line("[UpdateManager] FAILED to load " + patch)
+	
+	log_file.close()
+	_sync_current_version()
 
 func check_for_updates() -> void:
 	_sync_current_version()
