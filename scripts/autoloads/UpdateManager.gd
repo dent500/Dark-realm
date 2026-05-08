@@ -78,18 +78,26 @@ func _load_installed_patches() -> void:
 	var absolute_patch_dir = ProjectSettings.globalize_path(PATCH_DIR)
 	var dir = DirAccess.open(absolute_patch_dir)
 	if dir:
+		var patch_files = []
 		dir.list_dir_begin()
 		var file_name = dir.get_next()
 		while file_name != "":
 			if not dir.current_is_dir() and file_name.ends_with(".pck"):
-				var patch_path = absolute_patch_dir + file_name
-				print("[UpdateManager] Attempting to load patch at: ", patch_path)
-				var success = ProjectSettings.load_resource_pack(patch_path)
-				if success:
-					print("[UpdateManager] Patch LOADED SUCCESSFULLY from: ", patch_path)
-				else:
-					printerr("[UpdateManager] FAILED to load patch from: ", patch_path)
+				patch_files.append(file_name)
 			file_name = dir.get_next()
+		
+		# Sort patches alphabetically (v1.0.1 before v1.0.2)
+		# This ensures newer versions overwrite older ones in the virtual filesystem.
+		patch_files.sort()
+		
+		for patch_name in patch_files:
+			var patch_path = absolute_patch_dir + patch_name
+			print("[UpdateManager] Attempting to load patch at: ", patch_path)
+			var success = ProjectSettings.load_resource_pack(patch_path)
+			if success:
+				print("[UpdateManager] Patch LOADED SUCCESSFULLY from: ", patch_path)
+			else:
+				printerr("[UpdateManager] FAILED to load patch from: ", patch_path)
 
 func check_for_updates() -> void:
 	_sync_current_version()
