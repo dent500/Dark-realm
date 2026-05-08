@@ -23,8 +23,8 @@ extends CharacterBody3D
 @onready var spring_arm: SpringArm3D = $CameraPivot/SpringArm3D
 @onready var camera: Camera3D = $CameraPivot/SpringArm3D/Camera3D
 @onready var interact_ray: RayCast3D = $InteractRay
-@onready var combat_system: Node = $CombatSystem
-@onready var inventory: Node = $Inventory
+@onready var combat_system = $CombatSystem
+@onready var inventory = $Inventory
 @onready var animation_player: AnimationPlayer = $AnimationPlayer if has_node("AnimationPlayer") else null
 var mesh: Node3D = null
 var head_model = null
@@ -182,6 +182,7 @@ func _update_facial_nodes() -> void:
 # ─── State ────────────────────────────────────────────────────────────────────
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var is_sprinting: bool = false
+var is_exhausted: bool = false
 var is_interacting: bool = false
 var is_in_combat: bool = false
 var is_dead: bool = false
@@ -471,9 +472,11 @@ func _setup_input_map() -> void:
 		"ui_cancel": KEY_ESCAPE,
 		"move_left": KEY_A,
 		"move_right": KEY_D,
-		"move_forward": KEY_W,
 		"move_backward": KEY_S,
-		"sprint": KEY_SHIFT
+		"sprint": KEY_SHIFT,
+		"cast_spell": KEY_1,
+		"cycle_spell": KEY_2,
+		"ranged_attack": KEY_Q
 	}
 	
 	for action in actions:
@@ -489,14 +492,19 @@ func _setup_input_map() -> void:
 				break
 		
 		if not found:
-			var ev
 			if key == MOUSE_BUTTON_LEFT or key == MOUSE_BUTTON_RIGHT:
-				ev = InputEventMouseButton.new()
+				var ev = InputEventMouseButton.new()
 				ev.button_index = key
+				InputMap.action_add_event(action, ev)
 			else:
-				ev = InputEventKey.new()
-				ev.physical_keycode = key
-			InputMap.action_add_event(action, ev)
+				var ev = InputEventKey.new()
+				ev.keycode = actions[action]
+				InputMap.action_add_event(action, ev)
+				
+				# Also add as physical keycode for robustness
+				var ev_phys = InputEventKey.new()
+				ev_phys.physical_keycode = actions[action]
+				InputMap.action_add_event(action, ev_phys)
 
 func _check_authority_and_setup() -> void:
 	pass # Logic moved to _ready for immediate initialization
@@ -563,11 +571,14 @@ func _check_water_status() -> void:
 func _handle_stamina(delta: float) -> void:
 	if is_sprinting:
 		PlayerData.current_stamina = max(0, PlayerData.current_stamina - sprint_stamina_drain * delta)
+		if PlayerData.current_stamina <= 0:
+			is_sprinting = false
+			is_exhausted = true
 	else:
 		PlayerData.current_stamina = min(PlayerData.max_stamina, PlayerData.current_stamina + stamina_regen_rate * delta)
-	
-	if PlayerData.current_stamina <= 0:
-		is_sprinting = false
+		# Recover from exhaustion when stamina is back above 25%
+		if is_exhausted and PlayerData.current_stamina >= PlayerData.max_stamina * 0.25:
+			is_exhausted = false
 
 func _apply_gravity(delta: float) -> void:
 	if not is_on_floor():
@@ -582,7 +593,7 @@ func _handle_movement(delta: float) -> void:
 	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction = (camera_pivot.global_transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	
-	is_sprinting = Input.is_action_pressed("sprint") and input_dir.length() > 0 and PlayerData.current_stamina > 0
+	is_sprinting = Input.is_action_pressed("sprint") and input_dir.length() > 0 and PlayerData.current_stamina > 0 and not is_exhausted
 	
 	var target_speed = sprint_speed if is_sprinting else walk_speed
 	
@@ -678,8 +689,36 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event.is_action_pressed("attack"):
 		if combat_system and not combat_system.is_attacking:
-			if has_method("_animate_attack"): call("_animate_attack")
-			combat_system.melee_attack()
+			# Contextual attack: Ranger with bow uses ranged_attack
+			if PlayerData.char_class == "Ranger" and PlayerData.equipped.get("main_hand", "").to_lower().contains("bow"):
+				combat_system.ranged_attack()
+			else:
+				if has_method("_animate_attack"): call("_animate_attack")
+				combat_system.melee_attack()
+	
+	if event.is_action_pressed("ranged_attack"):
+		if combat_system and not combat_system.is_attacking:
+			combat_system.ranged_attack()
+			
+	if event.is_action_pressed("cast_spell"):
+		if combat_system:
+			print("[Player] Casting spell...")
+			combat_system.cast_active_spell()
+			
+	if event.is_action_pressed("cycle_spell"):
+		if combat_system:
+			print("[Player] Cycling spell...")
+			combat_system.cycle_spell()
+			var hud = get_tree().get_first_node_in_group("hud")
+			if hud:
+				if hud.has_method("update_ability_slots"): hud.update_ability_slots()
+				if hud.has_method("show_toast"):
+					var class_data = ClassData.get_all_classes()
+					for c in class_data:
+						if c["name"] == PlayerData.char_class:
+							var spell = c["abilities"][combat_system.active_spell_index]
+							hud.show_toast("Active Ability: " + spell["name"])
+							break
 	
 	if event.is_action_pressed("interact"):
 		_try_interact()

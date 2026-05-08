@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://bootstrap_scene"]
+[gd_scene format=3 uid="uid://mkl8jsythpcu"]
 
-[ext_resource type="Script" path="res://scripts/world/Bootstrap.gd" id="1_boot"]
+[ext_resource type="Script" uid="uid://cm3w4x8a7pyw7" path="res://scripts/world/Bootstrap.gd" id="1_boot"]
 
-[node name="Bootstrap" type="Control"]
+[node name="Bootstrap" type="Control" unique_id=2049574692]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,7 +11,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_boot")
 
-[node name="ColorRect" type="ColorRect" parent="."]
+[node name="ColorRect" type="ColorRect" parent="." unique_id=1235070341]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -20,7 +20,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.05, 0.05, 0.07, 1)
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=556325584]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -28,19 +28,19 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=472915659]
 layout_mode = 2
 theme_override_constants/separation = 20
 
-[node name="Label" type="Label" parent="VBoxContainer"]
-layout_mode = 2
+[node name="VBoxContainer#Label" type="Label" parent="." unique_id=1556674353]
+layout_mode = 0
 theme_override_font_sizes/font_size = 32
 text = "DARK REALM"
 horizontal_alignment = 1
 
-[node name="StatusLabel" type="Label" parent="VBoxContainer"]
+[node name="VBoxContainer#StatusLabel" type="Label" parent="." unique_id=268012993]
 unique_name_in_owner = true
-layout_mode = 2
+layout_mode = 0
 theme_override_colors/font_color = Color(0.6, 0.6, 0.7, 1)
 text = "Initializing World..."
 horizontal_alignment = 1

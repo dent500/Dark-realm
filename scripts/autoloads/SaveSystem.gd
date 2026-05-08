@@ -149,19 +149,19 @@ func _detect_instance_and_split_data() -> void:
 			if instance_index == 1 or instance_index == 0:
 				SAVE_DIR = "user://saves_test_host/"
 				print("[SaveSystem] Test Host Instance: Using folder ", SAVE_DIR)
-				_wipe_test_instance_data(SAVE_DIR)
+				# _wipe_test_instance_data(SAVE_DIR)
 			else:
 				SAVE_DIR = "user://saves_instance_" + str(instance_index) + "/"
 				print("[SaveSystem] Test Peer Instance ", instance_index, ": Using folder ", SAVE_DIR)
-				_wipe_test_instance_data(SAVE_DIR)
+				# _wipe_test_instance_data(SAVE_DIR)
 				
 				# Ensure directory exists
 				if not DirAccess.dir_exists_absolute(SAVE_DIR):
 					DirAccess.make_dir_recursive_absolute(SAVE_DIR)
 			break
 	
-	# Always create default test saves for all test instances (1-4)
-	_create_default_test_saves(instance_index)
+	
+	# No longer creating default test saves to allow for a clean start.
 
 func _wipe_test_instance_data(path: String) -> void:
 	if DirAccess.dir_exists_absolute(path):
@@ -175,48 +175,3 @@ func _wipe_test_instance_data(path: String) -> void:
 				file_name = dir.get_next()
 			print("[SaveSystem] Wiped existing test data at: ", path)
 
-func _create_default_test_saves(instance_idx: int) -> void:
-	var path = _get_save_path(0)
-	if FileAccess.file_exists(path): return
-	
-	print("[SaveSystem] Creating default test save for Instance ", instance_idx)
-	var names = ["Darcy Mark Dent", "Gorak Doom", "Lyra Nightshade", "Thrum Goldbeard"]
-	var races = ["Human", "Orc", "Elf", "Dwarf"]
-	var classes = ["Warrior", "Ranger", "Mage", "Rogue"]
-	var colors = [Color("#ffe0c0"), Color("#608060"), Color("#e0c0f0"), Color("#d0b090")]
-	
-	var idx = clamp(instance_idx - 1, 0, 3)
-	
-	var test_data = {
-		"version": "1.0",
-		"saved_at": Time.get_datetime_string_from_system(),
-		"slot": 0,
-		"player": {
-			"character_name": names[idx],
-			"race": races[idx],
-			"char_class": classes[idx],
-			"gender": "male",
-			"level": idx + 1,
-			"experience": 0,
-			"strength": 12,
-			"dexterity": 10,
-			"intelligence": 10,
-			"constitution": 12,
-			"wisdom": 10,
-			"charisma": 10,
-			"current_hp": 100 + (idx * 20),
-			"max_hp": 100 + (idx * 20),
-			"current_mana": 50,
-			"max_mana": 50,
-			"appearance_config": {
-				"skin_color": colors[idx],
-				"muscle": 1.0,
-				"clothing_type": "shirt_pants"
-			}
-		}
-	}
-	
-	var file = FileAccess.open(path, FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(test_data, "\t"))
-		file.close()

@@ -213,3 +213,16 @@ func _level_up() -> void:
 	experience_to_next = int(experience_to_next * 1.4)
 	calculate_derived_stats()
 	emit_signal("level_up", level)
+
+## Consumes mana and returns true if successful.
+func use_mana(amount: int) -> bool:
+	if current_mana >= amount:
+		current_mana -= amount
+		emit_signal("stats_changed")
+		return true
+	return false
+
+## Restores health to the player.
+func heal(amount: int) -> void:
+	current_hp = clamp(current_hp + amount, 0, max_hp)
+	emit_signal("stats_changed")

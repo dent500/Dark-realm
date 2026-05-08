@@ -212,14 +212,21 @@ func _snap_entities() -> void:
 			else:
 				p.global_position.y = h + 0.2
 	
-	# Snap NPCs and spawns
-	var parent = get_parent()
-	if parent:
-		for child in parent.get_children():
-			if child.is_in_group("spawn_point") or child.is_in_group("enemy_spawn"):
-				child.global_position.y = max(_get_h(child.global_position.x, child.global_position.z), water_level)
-			elif child is Node3D and not (child is StaticBody3D or child is WorldEnvironment or child == self):
-				child.global_position.y = max(_get_h(child.global_position.x, child.global_position.z), water_level) + 0.1
+	# Snap all enemies and markers in the scene
+	var enemies = get_tree().get_nodes_in_group("enemy")
+	for e in enemies:
+		var h = _get_h(e.global_position.x, e.global_position.z)
+		e.global_position.y = max(h, water_level) + 0.2
+		if "home_position" in e:
+			e.home_position = e.global_position
+
+	var spawns = get_tree().get_nodes_in_group("enemy_spawn")
+	for s in spawns:
+		s.global_position.y = max(_get_h(s.global_position.x, s.global_position.z), water_level)
+
+	var npc_group = get_tree().get_nodes_in_group("npc") # Assume NPCs might be in a group
+	for n in npc_group:
+		n.global_position.y = max(_get_h(n.global_position.x, n.global_position.z), water_level)
 
 func get_height_at(x: float, z: float) -> float:
 	return _get_h(x, z)

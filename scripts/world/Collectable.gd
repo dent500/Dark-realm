@@ -90,8 +90,6 @@ func _build_visuals() -> void:
 	add_child(col)
 
 func _get_item_name() -> String:
-	if Inventory != null:
-		pass  # Will use item_id directly — avoids circular ref at build time
 	# Map common IDs to readable names inline
 	var names: Dictionary = {
 		"health_potion": "Health Potion", "mana_crystal": "Mana Crystal",

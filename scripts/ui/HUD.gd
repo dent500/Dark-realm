@@ -186,6 +186,16 @@ func _process(delta: float) -> void:
 	# Update stamina every frame
 	if stamina_bar:
 		stamina_bar.value = (PlayerData.current_stamina / PlayerData.max_stamina) * 100.0
+		
+		# Visual indicator for exhaustion
+		var player = get_tree().get_first_node_in_group("local_player")
+		if player and "is_exhausted" in player:
+			var fill = stamina_bar.get_theme_stylebox("fill") as StyleBoxFlat
+			if fill:
+				if player.is_exhausted:
+					fill.bg_color = Color(0.4, 0.4, 0.4, 1.0) # Gray
+				else:
+					fill.bg_color = Color(0.9, 0.5, 0.1, 1.0) # Orange
 	if time_label:
 		time_label.text = "🕐 " + GameManager.get_time_string()
 		
@@ -735,6 +745,56 @@ func _build_dynamic_panels() -> void:
 	multiplayer_status_label.add_theme_color_override("font_color", Color.YELLOW)
 	multiplayer_status_label.add_theme_font_size_override("font_size", 20)
 	vbox.add_child(multiplayer_status_label)
+	
+	
+	# Ability Display
+	var ability_box = Panel.new()
+	ability_box.custom_minimum_size = Vector2(250, 40)
+	ability_box.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	ability_box.position = Vector2(40, 1080 - 180) # Above chat
+	var ab_style = StyleBoxFlat.new()
+	ab_style.bg_color = Color(0, 0, 0, 0.6)
+	ab_style.set_corner_radius_all(6)
+	ability_box.add_theme_stylebox_override("panel", ab_style)
+	
+	var ability_lbl = Label.new()
+	ability_lbl.name = "AbilityLabel"
+	ability_lbl.text = "Active: Melee Strike"
+	ability_lbl.set_anchors_preset(Control.PRESET_CENTER)
+	ability_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ability_lbl.add_theme_font_size_override("font_size", 16)
+	ability_box.add_child(ability_lbl)
+	add_child(ability_box)
+	
+	# ─── Action Bar ───
+	var action_bar = HBoxContainer.new()
+	action_bar.name = "ActionBar"
+	action_bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	action_bar.offset_top = -100
+	action_bar.add_theme_constant_override("separation", 15)
+	add_child(action_bar)
+	
+	for i in range(1, 5):
+		var slot = Panel.new()
+		slot.custom_minimum_size = Vector2(80, 80)
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.1, 0.1, 0.12, 0.8)
+		style.set_border_width_all(2)
+		style.border_color = Color(0.4, 0.4, 0.45)
+		style.set_corner_radius_all(4)
+		slot.add_theme_stylebox_override("panel", style)
+		
+		var lbl = Label.new()
+		lbl.name = "Slot" + str(i) + "_Label"
+		lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.add_theme_font_size_override("font_size", 12)
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		slot.add_child(lbl)
+		action_bar.add_child(slot)
+	
+	update_ability_slots()
 	
 	add_child(pause_menu)
 	
@@ -1468,3 +1528,44 @@ func show_pickup_toast(item_name: String, qty: int) -> void:
 	tween.tween_property(_toast_label, "modulate:a", 1.0, 0.15)
 	tween.tween_interval(1.8)
 	tween.tween_property(_toast_label, "modulate:a", 0.0, 0.5)
+
+func show_toast(text: String) -> void:
+	var lbl = find_child("AbilityLabel", true, false)
+	if lbl:
+		lbl.text = text
+		var tween = create_tween()
+		tween.tween_property(lbl, "modulate", Color.GOLD, 0.1)
+		tween.tween_property(lbl, "modulate", Color.WHITE, 0.3).set_delay(0.1)
+
+func update_ability_slots() -> void:
+	# Update the action bar icons/labels
+	var slot1 = find_child("Slot1_Label", true, false)
+	var slot2 = find_child("Slot2_Label", true, false)
+	
+	if slot1:
+		slot1.text = "Primary\n[LMB]"
+	if slot2:
+		slot2.text = "Block\n[RMB]"
+		
+	# Update 1 and 2 slots based on class abilities
+	var abilities = []
+	var class_data = ClassData.get_all_classes()
+	for c in class_data:
+		if c["name"] == PlayerData.char_class:
+			abilities = c["abilities"]
+			break
+			
+	var slot3 = find_child("Slot3_Label", true, false)
+	var slot4 = find_child("Slot4_Label", true, false)
+	
+	if slot3 and abilities.size() > 0:
+		var player = get_tree().get_first_node_in_group("local_player")
+		var idx = 0
+		if player and player.combat_system:
+			idx = player.combat_system.active_spell_index
+		
+		slot3.text = abilities[idx]["name"] + "\n[1]"
+		slot3.add_theme_color_override("font_color", Color.GOLD)
+		
+	if slot4:
+		slot4.text = "Cycle\n[2]"

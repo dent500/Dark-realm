@@ -20,6 +20,7 @@ var steam_id: int = 0
 var steam_name: String = ""
 var lobby_id: int = 0
 var steam_peer: SteamMultiplayerPeer
+var steam_status: String = "Not Initialized"
 
 # Store peer character data: { peer_id: { "appearance": {...}, "name": "...", ... } }
 var peer_data = {}
@@ -42,15 +43,30 @@ func _process(_delta: float) -> void:
 		Steam.run_callbacks()
 
 func _initialize_steam() -> void:
-	var response: Dictionary = Steam.steamInitEx()
+	if not ClassDB.class_exists("Steam"):
+		steam_status = "GDExtension Missing"
+		printerr("[Steam] FAILURE: GodotSteam GDExtension not found or not loaded.")
+		is_steam_running = false
+		return
+
+	# Passing 480 explicitly as a fallback to steam_appid.txt
+	var response: Dictionary = Steam.steamInitEx(480)
 	print("[Steam] Status: ", response)
 	
 	if response["status"] > 0:
-		print("[Steam] Failed to initialize: ", response["verbal"])
+		var error_msg = response.get("verbal", "Unknown Error")
+		steam_status = "Error: " + error_msg
+		printerr("[Steam] Failed to initialize: ", error_msg, " (Status: ", response["status"], ")")
+		
+		# If status is 2, it means Steam is not running
+		if response["status"] == 2:
+			printerr("[Steam] TIP: Ensure the Steam client is open and logged in.")
+			
 		is_steam_running = false
 		return
 		
 	is_steam_running = true
+	steam_status = "Connected"
 	steam_id = Steam.getSteamID()
 	steam_name = Steam.getPersonaName()
 	print("[Steam] Initialized as: ", steam_name, " (", steam_id, ")")

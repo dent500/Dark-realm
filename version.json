@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
-  "patch_url": "https://github.com/dent500/Dark-realm/releases/download/v1.0.1/patch_v1.0.1_final.pck",
-  "notes": "Final patch v1.0.1 with correct encoding and bootstrap loading."
+  "version": "1.0.2",
+  "patch_url": "https://github.com/dent500/Dark-realm/releases/download/v1.0.2/patch_v1.0.2.pck",
+  "notes": "v1.0.2: Major Combat & HUD Overhaul. Integrated Steamworks P2P networking for zero-config multiplayer. Improved world generation and player movement stability."
 }

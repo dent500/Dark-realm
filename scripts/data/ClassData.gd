@@ -61,9 +61,9 @@ static func get_all_classes() -> Array[Dictionary]:
 				"has_leg_skirt": true,
 			},
 			"animations": {
-				"player/strike_1": "res://assets/animations/player/sword and shield casting.fbx",
-				"player/strike_2": "res://assets/animations/player/sword and shield casting (2).fbx",
-				"player/strike_3": "res://assets/animations/player/sword and shield casting.fbx",
+				"player/strike_1": "res://assets/animations/player/combat/melee_slash_horizontal.fbx",
+				"player/strike_2": "res://assets/animations/player/combat/melee_slash_downward.fbx",
+				"player/strike_3": "res://assets/animations/player/combat/melee_slash_horizontal.fbx",
 				"player/jump":     "res://assets/animations/player/mobility/jump.fbx"
 			},
 			"starter_weapons": {

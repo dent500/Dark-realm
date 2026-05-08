@@ -12,20 +12,35 @@ const UPDATE_URL = "https://raw.githubusercontent.com/dent500/Dark-realm/main/ve
 const PATCH_DIR = "user://updates/"
 
 func _init() -> void:
-	# 1. Ensure patch directory exists before we try to load from it
+	# 1. Ensure patch directory exists
 	var absolute_patch_dir = ProjectSettings.globalize_path(PATCH_DIR)
 	if not DirAccess.dir_exists_absolute(absolute_patch_dir):
 		DirAccess.make_dir_absolute(absolute_patch_dir)
 		
-	# 2. Load patches as early as possible (before _ready)
-	_load_installed_patches()
+	# 2. Load patches (SKIP if in Editor to allow local development)
+	if not OS.has_feature("editor"):
+		_load_installed_patches()
+	else:
+		print("[UpdateManager] Editor detected. Skipping patch loading to use local source files.")
 	
-	# 3. Check if a patch provided a newer version.txt
+	# 3. Initial version sync
+	_sync_current_version()
+
+func _sync_current_version() -> void:
+	# Check for patch_version.txt first (highest priority)
+	if FileAccess.file_exists("res://patch_version.txt"):
+		var f = FileAccess.open("res://patch_version.txt", FileAccess.READ)
+		if f:
+			CURRENT_VERSION = f.get_as_text().strip_edges().replace(" ", "")
+			print("[UpdateManager] Version set from PATCH_VERSION: ", CURRENT_VERSION)
+			return
+
+	# Fallback to standard version.txt
 	if FileAccess.file_exists("res://version.txt"):
 		var f = FileAccess.open("res://version.txt", FileAccess.READ)
 		if f:
 			CURRENT_VERSION = f.get_as_text().strip_edges().replace(" ", "")
-			print("[UpdateManager] Version overridden by patch: ", CURRENT_VERSION)
+			print("[UpdateManager] Version set from VERSION.TXT: ", CURRENT_VERSION)
 
 var _http_request: HTTPRequest
 var _download_request: HTTPRequest
@@ -47,8 +62,19 @@ func _ready() -> void:
 	await get_tree().create_timer(1.0).timeout
 	check_for_updates()
 
+func _process(_delta: float) -> void:
+	if _download_request and _download_request.get_http_client_status() == HTTPClient.STATUS_BODY:
+		var downloaded = _download_request.get_downloaded_bytes()
+		var total = _download_request.get_body_size()
+		if total > 0:
+			download_progress.emit(downloaded, total)
+
 ## Loops through the user patch directory and loads any .pck files found.
 func _load_installed_patches() -> void:
+	if OS.has_feature("editor"):
+		print("[UpdateManager] Blocked manual patch load: Editor detected.")
+		return
+		
 	var absolute_patch_dir = ProjectSettings.globalize_path(PATCH_DIR)
 	var dir = DirAccess.open(absolute_patch_dir)
 	if dir:
@@ -66,7 +92,8 @@ func _load_installed_patches() -> void:
 			file_name = dir.get_next()
 
 func check_for_updates() -> void:
-	print("[UpdateManager] Checking for updates at: ", UPDATE_URL)
+	_sync_current_version()
+	print("[UpdateManager] Checking for updates at: ", UPDATE_URL, " (Current Version: ", CURRENT_VERSION, ")")
 	var err = _http_request.request(UPDATE_URL)
 	if err != OK:
 		print("[UpdateManager] HTTP Request failed: ", err)

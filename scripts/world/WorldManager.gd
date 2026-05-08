@@ -57,6 +57,33 @@ func _ready() -> void:
 	# Initial AI narration for zone arrival
 	AIDungeonMaster.narrate_arrival(PlayerData.current_zone)
 
+	# ─── Restore Skeletons ───
+	if multiplayer.is_server() or not NetworkManager.is_multiplayer_active():
+		_ensure_essential_world_nodes()
+
+func _ensure_essential_world_nodes() -> void:
+	# Ensure WaveManager is active for endless skeleton waves
+	if not has_node("WaveManager"):
+		var wm = Node.new()
+		wm.name = "WaveManager"
+		wm.set_script(load("res://scripts/world/WaveManager.gd"))
+		add_child(wm)
+		print("[WorldManager] WaveManager initialized.")
+	
+	# Ensure WorldBuilder is active for initial environmental skeletons
+	if not has_node("WorldBuilder"):
+		var wb = Node3D.new()
+		wb.name = "WorldBuilder"
+		wb.set_script(load("res://scripts/world/WorldBuilder.gd"))
+		# Assign the enemy scene (using the same one from MapLoader if possible)
+		var loader = get_node_or_null("MapLoader")
+		if loader and "enemy_scene" in loader:
+			wb.enemy_scene = loader.enemy_scene
+		else:
+			wb.enemy_scene = load("res://scenes/skeleton_enemy.tscn")
+		add_child(wb)
+		print("[WorldManager] WorldBuilder initialized.")
+
 	# Networking Initialization
 	if NetworkManager.is_multiplayer_active():
 		if multiplayer.is_server():

@@ -210,6 +210,9 @@ func _build_extra_enemies() -> void:
 		Vector3(15, 1, 5), Vector3(-18, 1, 5),
 		Vector3(8,  1, 18), Vector3(-10, 1, 20),
 		Vector3(22, 1, 15), Vector3(-22, 1, -5),
+		Vector3(0, 1, 10), Vector3(35, 1, -15),
+		Vector3(-35, 1, -25), Vector3(10, 1, -40),
+		Vector3(-10, 1, -40), Vector3(0, 1, -50)
 	]:
 		_spawn_enemy(pos)
 
@@ -367,12 +370,12 @@ func _spawn_npcs() -> void:
 		""
 	)
 
-func _spawn_npc(pos: Vector3, name_str: String, type_str: String, lines: Array, quest_id: String) -> void:
-	var npc = Node3D.new()
+func _spawn_npc(pos: Vector3, name_str: String, type_str: String, lines: Array[String], quest_id: String) -> void:
+	var npc = StaticBody3D.new()
 	npc.set_script(_npc_script)
 	add_child(npc)
 	npc.global_position = pos
 	npc.npc_name = name_str
 	npc.npc_type = type_str
-	npc.dialogue_lines = lines
+	npc.dialogue_lines.assign(lines)
 	npc.quest_to_give = quest_id

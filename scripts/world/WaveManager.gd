@@ -44,10 +44,9 @@ func start_next_wave() -> void:
 	AIDungeonMaster.narrate_custom("Wave " + str(current_wave) + " has begun. " + str(num_enemies) + " skeletons rise from the dust! Their power has drastically increased.")
 	
 	var spawn_points = []
-	var spawns_parent = get_parent().get_node_or_null("EnemySpawns")
-	if spawns_parent:
-		for c in spawns_parent.get_children():
-			if c is Node3D: spawn_points.append(c.global_position)
+	var spawns = get_tree().get_nodes_in_group("enemy_spawn")
+	for s in spawns:
+		spawn_points.append(s.global_position)
 	
 	for i in range(num_enemies):
 		var en = enemy_scene.instantiate()

@@ -65,6 +65,9 @@ func _ready() -> void:
 	if not UpdateManager.update_check_completed.is_connected(_on_update_check_finished):
 		UpdateManager.update_check_completed.connect(_on_update_check_finished)
 	
+	if not UpdateManager.download_progress.is_connected(_on_update_progress):
+		UpdateManager.download_progress.connect(_on_update_progress)
+	
 	print("[MainMenu] Initialization complete.")
 
 func _setup_confirmation_dialog() -> void:
@@ -91,7 +94,7 @@ func _animate_title() -> void:
 			var tex = load(logo_res_path)
 			if tex:
 				logo_node.texture = tex
-				logo_node.custom_minimum_size = Vector2(0, 700)
+				logo_node.custom_minimum_size = Vector2(0, 550)
 				print("[MainMenu] SUCCESS: Logo assigned successfully.")
 			else:
 				print("[MainMenu] ERROR: load() returned null for: ", logo_res_path)
@@ -247,7 +250,6 @@ func _integrate_ui_to_main_vbox() -> void:
 	
 	_update_btn = _create_menu_button("✨ Update Available!", Color(0.1, 0.4, 0.3))
 	_update_btn.hide()
-	_update_btn.pressed.connect(_on_update_pressed)
 	_launcher_ui.add_child(_update_btn)
 
 	# ─── 2. CHARACTER SELECTION UI ───
@@ -262,7 +264,7 @@ func _integrate_ui_to_main_vbox() -> void:
 	if NetworkManager.is_steam_running:
 		_steam_user_lbl.text = "Logged in as: " + NetworkManager.steam_name
 	else:
-		_steam_user_lbl.text = "Steam NOT INITIALIZED"
+		_steam_user_lbl.text = "Steam: " + NetworkManager.steam_status
 		_steam_user_lbl.add_theme_color_override("font_color", Color(1, 0.4, 0.4))
 	
 	# Action Row (Continue + Delete)
@@ -519,16 +521,23 @@ func _on_host_pressed() -> void:
 		return
 		
 	SaveSystem.load_game(_selected_slot)
+	
+	# Connect to lobby_id_received to know when we are ready to enter
+	if not NetworkManager.lobby_id_received.is_connected(_on_host_lobby_ready):
+		NetworkManager.lobby_id_received.connect(_on_host_lobby_ready)
+		
 	var err = NetworkManager.host_game()
 	if err == OK:
 		_status_lbl.text = "Creating Steam Lobby..."
-		if not NetworkManager.peer_connected.is_connected(_on_host_started):
-			NetworkManager.peer_connected.connect(_on_host_started)
 
-func _on_host_started(_id: int) -> void:
-	# First peer (us) connected, or someone else
-	if multiplayer.is_server():
-		GameManager.enter_world()
+func _on_host_lobby_ready(_id: int) -> void:
+	# Disconnect so we don't trigger this again if something else happens
+	if NetworkManager.lobby_id_received.is_connected(_on_host_lobby_ready):
+		NetworkManager.lobby_id_received.disconnect(_on_host_lobby_ready)
+	
+	_status_lbl.text = "Lobby Ready! Entering world..."
+	await get_tree().create_timer(1.0).timeout
+	GameManager.enter_world()
 
 func _on_join_pressed() -> void:
 	var slot_data = _podiums_data[_selected_slot]
@@ -605,27 +614,42 @@ func _build_preview_config() -> Dictionary:
 	if PlayerData.skin_tone < skin_tones.size(): combined_config["skin_color"] = skin_tones[PlayerData.skin_tone]
 	return {"config": combined_config, "anims": class_anim_config}
 func _on_update_check_finished(has_update: bool, latest_v: String, _url: String) -> void:
-	# Debug print to help us troubleshoot
-	print("[MainMenu] Update Check: HasUpdate=", has_update, " Local=", UpdateManager.CURRENT_VERSION, " Remote=", latest_v)
+	print("[DEBUG] AUTO-UPDATE TRIGGERED - HasUpdate: ", has_update, " URL: ", _url)
 	
 	if has_update:
-		_version_lbl.text = "v" + UpdateManager.CURRENT_VERSION + " -> New Version v" + latest_v + " Available!"
+		_version_lbl.text = "v" + UpdateManager.CURRENT_VERSION + " -> Updating to v" + latest_v + "..."
 		_version_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
 		_update_btn.show()
+		_update_btn.disabled = true
+		_update_btn.text = "Preparing Download..."
+		
+		# Auto-trigger download using the passed URL
+		if not _url.is_empty():
+			print("[MainMenu] Auto-triggering update download from: ", _url)
+			UpdateManager.download_patch(_url)
+			if not UpdateManager.download_completed.is_connected(_on_patch_downloaded):
+				UpdateManager.download_completed.connect(_on_patch_downloaded)
+		else:
+			print("[MainMenu] ERROR: Update URL is empty!")
 
-func _on_update_pressed() -> void:
-	_update_btn.disabled = true
-	_update_btn.text = "Downloading..."
-	var url = UpdateManager.latest_version_info.get("patch_url", "")
-	UpdateManager.download_patch(url)
-	if not UpdateManager.download_completed.is_connected(_on_patch_downloaded):
-		UpdateManager.download_completed.connect(_on_patch_downloaded)
+func _on_update_progress(received: int, total: int) -> void:
+	var percent = int((float(received) / float(total)) * 100.0)
+	_update_btn.text = "Downloading Update: " + str(percent) + "%"
+	_version_lbl.text = "Downloading v" + UpdateManager.latest_version_info.get("version", "") + " (" + str(percent) + "%)"
 
 func _on_patch_downloaded(success: bool) -> void:
 	if success:
-		_update_btn.text = "Update Ready! Restart Game"
+		_update_btn.text = "Update Success! Restarting..."
 		_update_btn.add_theme_color_override("font_color", Color(0.5, 1.0, 0.5))
-		# In a real scenario, you might want to show a popup or automatically restart.
+		print("[MainMenu] Update successful. Relaunching game...")
+		
+		# Give a tiny bit of time for the UI to show success
+		await get_tree().create_timer(1.5).timeout
+		
+		# This is the standard way to restart a Godot app
+		OS.set_restart_on_exit(true)
+		get_tree().quit()
 	else:
-		_update_btn.text = "Download Failed"
-		_update_btn.disabled = false
+		_update_btn.text = "Update Failed. Retrying in next launch."
+		_update_btn.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+		_update_btn.disabled = false # Allow manual retry if it failed? Or just leave it.

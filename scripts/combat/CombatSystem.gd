@@ -113,21 +113,95 @@ func _get_attack_speed() -> float:
 
 # ─── Ranged ───────────────────────────────────────────────────────────────────
 func ranged_attack() -> void:
-	if attack_cooldown > 0:
+	if attack_cooldown > 0 or is_attacking:
 		return
 	if PlayerData.char_class not in ["Ranger", "Rogue"]:
 		return
-	attack_cooldown = 1.0
+	
+	# Only the authority can initiate an attack
+	var player = get_parent()
+	if player.has_method("is_multiplayer_authority") and not player.is_multiplayer_authority():
+		return
+
+	attack_cooldown = 0.8
+	is_attacking = true
+	
+	if NetworkManager.is_multiplayer_active():
+		rpc("sync_attack_anim")
+		
+	# Spawn projectile
 	if projectile_scene:
 		var projectile = projectile_scene.instantiate()
 		get_tree().current_scene.add_child(projectile)
-		var player = get_parent()
 		projectile.global_position = player.global_position + Vector3(0, 1.4, 0)
 		if "character_yaw" in player:
 			projectile.direction = Vector3(-sin(player.character_yaw), 0, -cos(player.character_yaw))
 		else:
 			projectile.direction = -player.global_transform.basis.z
 		projectile.damage = _calculate_melee_damage()
+	else:
+		# Procedural Arrow Fallback
+		_spawn_arrow()
+	
+	await get_tree().create_timer(0.4).timeout
+	is_attacking = false
+
+func _spawn_arrow() -> void:
+	# Create a simple arrow-like mesh
+	var proj = RigidBody3D.new()
+	proj.gravity_scale = 0.5 # Slight drop
+	
+	var mesh = MeshInstance3D.new()
+	var cap = CylinderMesh.new()
+	cap.top_radius = 0.02; cap.bottom_radius = 0.02; cap.height = 0.6
+	mesh.mesh = cap
+	mesh.rotation.x = deg_to_rad(90) # Point forward
+	
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.6, 0.4, 0.2)
+	mesh.material_override = mat
+	proj.add_child(mesh)
+	
+	var col = CollisionShape3D.new()
+	col.shape = BoxShape3D.new()
+	col.shape.size = Vector3(0.05, 0.05, 0.6)
+	proj.add_child(col)
+	
+	get_tree().current_scene.add_child(proj)
+	var player = get_parent()
+	var forward: Vector3
+	
+	# Aiming: Use camera direction if available (for local player)
+	if player.has_node("CameraPivot/SpringArm3D/Camera3D"):
+		var cam = player.get_node("CameraPivot/SpringArm3D/Camera3D")
+		forward = -cam.global_transform.basis.z
+	elif "character_yaw" in player:
+		forward = Vector3(-sin(player.character_yaw), 0, -cos(player.character_yaw))
+	else:
+		forward = -player.global_transform.basis.z
+	
+	proj.linear_velocity = forward * 40.0
+	proj.look_at(proj.global_position + forward)
+	
+	var damage = _calculate_melee_damage()
+	var script = GDScript.new()
+	script.source_code = """extends RigidBody3D
+var damage = %d
+func _ready():
+	body_entered.connect(_on_body_entered)
+	await get_tree().create_timer(5.0).timeout
+	queue_free()
+func _on_body_entered(body):
+	if body == get_parent(): return
+	if body.has_method("take_damage"):
+		body.take_damage(damage)
+	# Stick to the target for a moment or just vanish
+	queue_free()
+""" % damage
+	script.reload()
+	proj.set_script(script)
+	proj.contact_monitor = true
+	proj.max_contacts_reported = 1
 
 # ─── Magic ────────────────────────────────────────────────────────────────────
 func cast_active_spell() -> void:
@@ -217,12 +291,19 @@ func _cast_projectile_spell(damage: int, speed: float, color: Color) -> void:
 	get_tree().current_scene.add_child(proj)
 	var player = get_parent()
 	proj.global_position = player.global_position + Vector3(0, 1.4, 0)
+	
 	var forward: Vector3
-	if "character_yaw" in player:
+	# Aiming: Use camera direction if available
+	if player.has_node("CameraPivot/SpringArm3D/Camera3D"):
+		var cam = player.get_node("CameraPivot/SpringArm3D/Camera3D")
+		forward = -cam.global_transform.basis.z
+	elif "character_yaw" in player:
 		forward = Vector3(-sin(player.character_yaw), 0, -cos(player.character_yaw))
 	else:
 		forward = -player.global_transform.basis.z
+		
 	proj.linear_velocity = forward * (speed * 10.0)
+	proj.look_at(proj.global_position + forward)
 	# Script to handle collision
 	var script = GDScript.new()
 	script.source_code = """extends RigidBody3D

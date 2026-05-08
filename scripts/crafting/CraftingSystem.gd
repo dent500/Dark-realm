@@ -66,12 +66,12 @@ const RECIPES = [
 	}
 ]
 
-var _inventory: Node = null
+var _inventory = null
 
 func _ready() -> void:
 	pass
 
-func set_inventory(inv: Node) -> void:
+func set_inventory(inv) -> void:
 	_inventory = inv
 
 # ─── Can Craft ────────────────────────────────────────────────────────────────
