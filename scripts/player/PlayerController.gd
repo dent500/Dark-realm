@@ -356,11 +356,11 @@ func _wait_for_terrain_and_snap() -> void:
 			await terrain.terrain_ready
 	
 	await get_tree().create_timer(0.2).timeout
-	_snap_to_terrain()
 	if is_multiplayer_authority() and camera:
 		camera.make_current()
 	
 	# Character visuals are now initialized in _check_authority_and_setup to ensure they run on the host too.
+
 
 	# (Debug spheres and labels removed for final cleanup)
 
