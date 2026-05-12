@@ -7,6 +7,9 @@
 # Build and Tooling
 build/
 installer/*.exe
+installer/*.pck
+installer/*.zip
+installer/Dark_Realm_Setup/
 tools_and_temp/
 video Recording/
 scratch/

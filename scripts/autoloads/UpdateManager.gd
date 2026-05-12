@@ -7,7 +7,10 @@ signal download_progress(received_bytes: int, total_bytes: int)
 signal download_completed(success: bool)
 
 var CURRENT_VERSION = "1.0.0"
-# Replace this with your actual version JSON URL (e.g., GitHub Raw link)
+# BASE_VERSION represents the version hardcoded in the EXE.
+# This is NEVER updated by patches.
+const BASE_VERSION = "1.0.0" 
+
 const UPDATE_URL = "https://raw.githubusercontent.com/dent500/Dark-realm/main/version.json"
 const PATCH_DIR = "user://updates/"
 
@@ -18,10 +21,15 @@ func _init() -> void:
 		DirAccess.make_dir_absolute(absolute_patch_dir)
 		
 	# 2. Load patches (SKIP if in Editor to allow local development)
-	if not OS.has_feature("editor"):
-		_load_installed_patches()
+	if OS.has_feature("editor"):
+		print("[UpdateManager] Editor detected. STRICTLY skipping patch loading.")
+		# Force clear any weird internal pack state if possible
 	else:
-		print("[UpdateManager] Editor detected. Skipping patch loading to use local source files.")
+		_load_installed_patches()
+	
+	# Diagnostic: Check if any resource packs are somehow loaded anyway
+	# (Note: Godot 4 doesn't have a direct "list_loaded_packs", but we can check res:// status)
+	print("[UpdateManager] Project base path: ", OS.get_executable_path().get_base_dir())
 	
 	# 3. Initial version sync
 	_sync_current_version()
@@ -70,9 +78,11 @@ func _process(_delta: float) -> void:
 			download_progress.emit(downloaded, total)
 
 ## Loops through the user patch directory and loads any .pck files found.
+## Only loads patches that are NEWER than the BASE_VERSION.
 func _load_installed_patches() -> void:
 	var log_file = FileAccess.open("user://update_log.txt", FileAccess.WRITE)
 	log_file.store_line("--- Update Log Started at " + Time.get_datetime_string_from_system() + " ---")
+	log_file.store_line("[UpdateManager] BASE_VERSION: " + BASE_VERSION)
 	
 	if not DirAccess.dir_exists_absolute(PATCH_DIR):
 		log_file.store_line("[UpdateManager] No updates folder found at " + PATCH_DIR)
@@ -88,35 +98,44 @@ func _load_installed_patches() -> void:
 	var file_name = dir.get_next()
 	while file_name != "":
 		if not dir.current_is_dir() and file_name.ends_with(".pck"):
-			patch_files.append(file_name)
+			# Parse version from filename like "patch_v1.0.5.pck"
+			var version_str = file_name.get_basename().get_slice("_v", 1)
+			if version_str.is_empty(): 
+				version_str = file_name.get_basename().replace("patch_", "")
+			
+			if _is_version_newer(version_str, BASE_VERSION):
+				patch_files.append({"name": file_name, "version": version_str})
+			else:
+				log_file.store_line("[UpdateManager] Deleting obsolete patch: " + file_name + " (Base is newer: " + BASE_VERSION + ")")
+				dir.remove(file_name)
+				
 		file_name = dir.get_next()
 	
-	# Sort patches alphabetically to ensure newest (v1.0.2) overrides older ones
-	patch_files.sort()
-	log_file.store_line("[UpdateManager] Found " + str(patch_files.size()) + " patches: " + str(patch_files))
+	# Sort patches by version to ensure highest version wins
+	patch_files.sort_custom(func(a, b): return _is_version_newer(b.version, a.version))
+	
+	log_file.store_line("[UpdateManager] Found " + str(patch_files.size()) + " valid patches.")
 
-	for patch in patch_files:
-		var patch_path = PATCH_DIR + patch
-		var absolute_path = ProjectSettings.globalize_path(patch_path)
-		log_file.store_line("[UpdateManager] Attempting to load: " + absolute_path)
+	for patch_info in patch_files:
+		var patch_name = patch_info.name
+		var patch_path = PATCH_DIR + patch_name
+		log_file.store_line("[UpdateManager] Attempting to load: " + patch_name)
 		
 		var success = ProjectSettings.load_resource_pack(patch_path)
 		if success:
-			log_file.store_line("[UpdateManager] SUCCESS: Loaded " + patch)
-			# Verify if version.txt was updated by the pack
-			if FileAccess.file_exists("res://version.txt"):
-				var v = FileAccess.get_file_as_string("res://version.txt").strip_edges()
-				log_file.store_line("[UpdateManager] Patch internal version: " + v)
+			log_file.store_line("[UpdateManager] SUCCESS: Loaded " + patch_name)
 		else:
-			log_file.store_line("[UpdateManager] FAILED to load " + patch)
+			log_file.store_line("[UpdateManager] FAILED to load " + patch_name)
 	
 	log_file.close()
 	_sync_current_version()
 
 func check_for_updates() -> void:
 	_sync_current_version()
-	print("[UpdateManager] Checking for updates at: ", UPDATE_URL, " (Current Version: ", CURRENT_VERSION, ")")
-	var err = _http_request.request(UPDATE_URL)
+	# Cache busting: Add a random parameter to the URL
+	var cache_bust_url = UPDATE_URL + "?t=" + str(Time.get_unix_time_from_system())
+	print("[UpdateManager] Checking for updates at: ", cache_bust_url, " (Current Version: ", CURRENT_VERSION, ")")
+	var err = _http_request.request(cache_bust_url)
 	if err != OK:
 		print("[UpdateManager] HTTP Request failed: ", err)
 		update_check_completed.emit(false, CURRENT_VERSION, "")
@@ -161,7 +180,9 @@ func _on_download_completed(result: int, response_code: int, _headers: PackedStr
 	if not success:
 		printerr("[UpdateManager] Download FAILED! Result: ", result, " HTTP Code: ", response_code)
 	else:
-		print("[UpdateManager] Download SUCCESS!")
+		print("[UpdateManager] Download SUCCESS! Preparing to restart...")
+		OS.set_restart_on_exit(true)
+		get_tree().quit()
 	download_completed.emit(success)
 
 func _is_version_newer(latest: String, current: String) -> bool:

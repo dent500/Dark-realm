@@ -8,9 +8,12 @@ func _ready():
 		get_node("%StatusLabel").text = "Checking for Patches..."
 	
 	# 2. UpdateManager is already an autoload, so it ran its _init()
-	# But we call its loading function again just to be safe
-	if has_node("/root/UpdateManager"):
-		get_node("/root/UpdateManager")._load_installed_patches()
+	# Only load patches if NOT in the editor.
+	if not OS.has_feature("editor"):
+		if has_node("/root/UpdateManager"):
+			get_node("/root/UpdateManager")._load_installed_patches()
+	else:
+		print("[Bootstrap] Editor detected. Skipping manual patch load to preserve local edits.")
 	
 	if has_node("%StatusLabel"):
 		get_node("%StatusLabel").text = "Loading Realm..."

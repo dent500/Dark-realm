@@ -10,10 +10,7 @@ static func build_character(root_node: Node3D, config: Dictionary) -> Dictionary
 	var fbx = load(fbx_path)
 	if not fbx:
 		printerr("[CharacterBuilder] ERROR: Failed to load base rig at: ", fbx_path)
-		# Diagnostics for exported builds
-		if not FileAccess.file_exists(fbx_path):
-			printerr("[CharacterBuilder] DIAGNOSTIC: File does not exist on virtual filesystem.")
-		return {}
+		return _build_fallback_character(root_node, config)
 	
 	var rig = fbx.instantiate()
 	rig.visible = true
@@ -171,6 +168,16 @@ static func initialize_animations(rig: Node3D, skeleton: Skeleton3D, _unused: No
 	print("[CharacterBuilder] Animations loaded: ", lib.get_animation_list())
 	print("[CharacterBuilder] Playing idle: ", play_key, " for race: ", race)
 	return ap
+
+static func _build_fallback_character(root: Node3D, config: Dictionary) -> Dictionary:
+	print("[CharacterBuilder] Building SAFETY FALLBACK character.")
+	var mesh_inst = MeshInstance3D.new()
+	mesh_inst.mesh = CapsuleMesh.new()
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color.WHITE
+	mesh_inst.material_override = mat
+	root.add_child(mesh_inst)
+	return {"instance": mesh_inst}
 
 
 ## Find an existing BoneAttachment3D for a bone, or create one if missing.

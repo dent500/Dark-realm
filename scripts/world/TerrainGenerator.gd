@@ -89,6 +89,13 @@ func _generate_terrain() -> void:
 	# Detail texture
 	if ResourceLoader.exists("res://assets/textures/ground.png"):
 		var tex = load("res://assets/textures/ground.png")
+		
+		# Fallback for raw textures that might fail to load as a resource
+		if not tex:
+			var img = Image.load_from_file(ProjectSettings.globalize_path("res://assets/textures/ground.png"))
+			if img:
+				tex = ImageTexture.create_from_image(img)
+		
 		if tex:
 			mat.albedo_texture = tex
 			mat.uv1_triplanar = true
@@ -206,7 +213,7 @@ func _snap_entities() -> void:
 	var players = get_tree().get_nodes_in_group("player")
 	for p in players:
 		if p.is_multiplayer_authority():
-			var h = _get_h(p.global_position.x, p.global_position.z)
+			var h = max(_get_h(p.global_position.x, p.global_position.z), water_level)
 			if p.has_method("teleport_to"):
 				p.teleport_to(Vector3(p.global_position.x, h + 0.2, p.global_position.z), 0.0)
 			else:
@@ -232,4 +239,4 @@ func get_height_at(x: float, z: float) -> float:
 	return _get_h(x, z)
 
 func get_safe_spawn_near(x: float, z: float, _r: float = 0.0) -> Vector3:
-	return Vector3(x, _get_h(x, z) + 0.2, z)
+	return Vector3(x, max(_get_h(x, z), water_level) + 0.2, z)

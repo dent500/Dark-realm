@@ -26,6 +26,7 @@ var steam_status: String = "Not Initialized"
 var peer_data = {}
 
 func _ready() -> void:
+	print("=== [NetworkManager] _ready() v2 LOADED ===")
 	_initialize_steam()
 	
 	multiplayer.peer_connected.connect(_on_peer_connected)
@@ -110,6 +111,11 @@ func _on_lobby_joined(l_id: int, _permissions: int, _locked: bool, response: int
 		print("[Steam] Failed to join lobby: ", response)
 		emit_signal("connection_failed")
 		return
+	
+	# Guard: if we are already connected to this lobby, ignore the duplicate event
+	if lobby_id == l_id and multiplayer.multiplayer_peer != null and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer):
+		print("[Steam] Already connected to lobby ", l_id, ". Ignoring duplicate join event.")
+		return
 		
 	lobby_id = l_id
 	print("[Steam] Joined lobby: ", lobby_id)
@@ -118,10 +124,13 @@ func _on_lobby_joined(l_id: int, _permissions: int, _locked: bool, response: int
 	var err = steam_peer.create_client(Steam.getLobbyOwner(lobby_id))
 	if err != OK:
 		print("[Steam] Failed to create client peer: ", err)
+		steam_peer = null  # Don't leave steam_peer pointing to a broken object
 		return
 		
 	multiplayer.multiplayer_peer = steam_peer
-	emit_signal("connection_succeeded")
+	# Do NOT emit connection_succeeded here. That signal should mean the P2P handshake is done.
+	# We rely on the low-level connected_to_server signal to trigger that in _on_connected_to_server.
+	print("[Steam] Lobby joined. P2P handshake started...")
 
 func _on_lobby_join_requested(l_id: int, _friend_id: int) -> void:
 	print("[Steam] Join requested for lobby: ", l_id)
@@ -140,6 +149,10 @@ func host_game() -> int:
 
 func join_lobby(l_id: int) -> void:
 	if not is_steam_running: return
+	# Guard: don't re-join if already in this lobby
+	if lobby_id == l_id:
+		print("[Steam] Already in lobby ", l_id, ". Skipping redundant join.")
+		return
 	Steam.joinLobby(l_id)
 
 func join_game(address: String) -> Error:
@@ -155,15 +168,28 @@ func join_game(address: String) -> Error:
 
 func _on_peer_connected(id: int) -> void:
 	print("[NetworkManager] Peer connected: ", id)
+	# Give the Steam relay a moment to fully open the data channel
+	await get_tree().create_timer(1.5).timeout
+	
 	if multiplayer.is_server():
-		rpc_id(id, "register_player_from_server", 1, PlayerData.to_dict())
+		print("[NetworkManager] SERVER: Broadcasting all data to new peer ", id)
+		# Broadcast host data to ALL peers (new peer will receive it too)
+		register_player_from_server.rpc(1, PlayerData.to_dict())
+		# Broadcast all other existing peers' data to ALL peers
 		for peer_id in peer_data:
 			if peer_id != id and peer_id != 1:
-				rpc_id(id, "register_player_from_server", peer_id, peer_data[peer_id])
+				register_player_from_server.rpc(peer_id, peer_data[peer_id])
+		# Tell WorldManager to spawn the new player across all peers
+		var wm = get_tree().get_first_node_in_group("world_manager")
+		if wm and wm.has_method("_spawn_player_multi"):
+			wm._spawn_player_multi(id)
+	else:
+		# Client: Send our data to the server so everyone can see us
+		print("[NetworkManager] CLIENT: Registering with server for peer ", multiplayer.get_unique_id())
+		register_player.rpc(PlayerData.to_dict())
+		# Also register locally as a fallback
+		_register_player(multiplayer.get_unique_id(), PlayerData.to_dict())
 	
-	if not multiplayer.is_server():
-		rpc_id(1, "register_player", PlayerData.to_dict())
-		
 	emit_signal("peer_connected", id)
 
 func _on_peer_disconnected(id: int) -> void:
@@ -203,8 +229,11 @@ func request_player_relay() -> void:
 			if peer_id != requester_id:
 				register_player_from_server.rpc_id(requester_id, peer_id, peer_data[peer_id])
 
-@rpc("authority", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func register_player_from_server(id: int, data: Dictionary) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id != 0 and not multiplayer.is_server() and sender_id != 1:
+		return # Only trust the server (1) or local calls (0) for data relays
 	_register_player(id, data)
 	var wm = get_tree().get_first_node_in_group("world_manager")
 	if wm and wm.has_method("ensure_player_spawned"):

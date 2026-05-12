@@ -18,6 +18,18 @@ extends CharacterBody3D
 @export var camera_distance: float = 5.0
 @export var attack_speed_scale: float = 1.1 # Faster, more responsive swings
 
+# ─── AI / Bot Config ──────────────────────────────────────────────────────────
+var is_simulated: bool = false
+var ai_target: Node3D = null
+var ai_state: String = "idle" # idle, follow, attack
+var ai_timer: float = 0.0
+
+# ─── Identity Config ─────────────────────────────────────────────────────────
+var char_name: String = "Player"
+var char_race: String = "human"
+var char_class: String = "Warrior"
+var char_appearance: Dictionary = {}
+
 # ─── Nodes ───────────────────────────────────────────────────────────────────
 @onready var camera_pivot: Node3D = $CameraPivot
 @onready var spring_arm: SpringArm3D = $CameraPivot/SpringArm3D
@@ -227,6 +239,17 @@ var turn_speed: float = 3.0
 
 # ─── Lifecycle ────────────────────────────────────────────────────────────────
 func _ready() -> void:
+	# Identity tagging for mirroring and HUD
+	if is_multiplayer_authority() and not is_simulated:
+		add_to_group("local_player")
+		print("[PlayerController] Tagged as local_player: ", name)
+	
+	if is_simulated:
+		mesh = get_node_or_null("Visuals")
+		# Bots build visuals immediately
+		call_deferred("_build_simulated_character")
+		return
+	
 	add_to_group("player")
 	
 	# Ensure remote players always start at their last known sync position
@@ -354,10 +377,41 @@ func _wait_for_terrain_and_snap() -> void:
 	if terrain and not terrain.has_node("TerrainCollision"):
 		if terrain.has_signal("terrain_ready"):
 			await terrain.terrain_ready
-	
-	await get_tree().create_timer(0.2).timeout
-	if is_multiplayer_authority() and camera:
-		camera.make_current()
+
+	# --- CAMERA ACTIVATION RETRY LOOP ---
+	# The Steam P2P handshake can complete AFTER _ready() runs, meaning
+	# is_multiplayer_authority() may return false on the first check.
+	# We poll every 0.3s for up to 5 seconds until authority is confirmed.
+	var my_id = multiplayer.get_unique_id()
+	var node_id_str = name.replace("@", "").replace("Player", "")
+	var node_id = node_id_str.to_int() if node_id_str.is_valid_int() else -1
+	var elapsed = 0.0
+	var authority_confirmed = false
+	while elapsed < 5.0:
+		await get_tree().create_timer(0.3).timeout
+		elapsed += 0.3
+		# Re-check: either is_multiplayer_authority() is now true, or
+		# our node name matches our actual peer ID (handles the race window)
+		my_id = multiplayer.get_unique_id()
+		if is_multiplayer_authority() or (node_id > 0 and node_id == my_id):
+			authority_confirmed = true
+			break
+
+	if authority_confirmed:
+		print("[PlayerController] Camera authority confirmed for peer: ", my_id, ". Activating camera.")
+		if not is_multiplayer_authority():
+			set_multiplayer_authority(my_id)
+			if has_node("MultiplayerSynchronizer"):
+				$MultiplayerSynchronizer.set_multiplayer_authority(my_id)
+		if camera:
+			camera.current = true
+			camera.make_current()
+		if not is_in_group("local_player"):
+			add_to_group("local_player")
+		if spring_arm:
+			spring_arm.process_mode = Node.PROCESS_MODE_INHERIT
+	else:
+		print("[PlayerController] WARNING: Could not confirm authority after 5s for node: ", name)
 	
 	# Character visuals are now initialized in _check_authority_and_setup to ensure they run on the host too.
 
@@ -516,11 +570,18 @@ func _check_underground() -> void:
 	if not terrain or not terrain.has_node("TerrainCollision"): return
 	if terrain and terrain.has_method("_get_h"):
 		var h = terrain._get_h(global_position.x, global_position.z)
+		var water_level = 0.0
+		if "water_level" in terrain:
+			water_level = terrain.water_level
+		var min_h = max(h, water_level)
 		if global_position.y < h - 0.5:
-			global_position.y = h + 0.5
+			global_position.y = min_h + 0.5
 
 # ─── Physics ──────────────────────────────────────────────────────────────────
 func _physics_process(delta: float) -> void:
+	if is_simulated:
+		_update_ai(delta)
+		return
 	if not is_multiplayer_authority():
 		return
 		
@@ -980,9 +1041,9 @@ func _build_native_block_character(char_appearance: Dictionary = {}) -> void:
 		if not combined_config.has("skin_color"):
 			combined_config["skin_color"] = Color(0.8, 0.7, 0.6)
 
-	var char_race = combined_config.get("race", "Human")
-	# IMPORTANT: Default to empty if not found, so we can detect if sync hasn't happened yet
-	var char_class = combined_config.get("char_class", "") 
+	# Use class variables if already set (e.g. for bots), otherwise read from config
+	if char_race == "human": char_race = combined_config.get("race", "human").to_lower()
+	if char_class == "Warrior": char_class = combined_config.get("char_class", "")
 	
 	# Apply race body_profile (scales, special features) from RaceData
 	var all_races: Array = RaceData.get_all_races()
@@ -1011,7 +1072,7 @@ func _build_native_block_character(char_appearance: Dictionary = {}) -> void:
 			break
 			
 	# If class not synced yet, don't build gear/clothing to avoid 'Warrior' ghosts
-	if not class_found and not is_local:
+	if not class_found and not is_local and not is_simulated:
 		print("[PlayerController] Waiting for class sync for: ", char_race)
 		return
 
@@ -1185,4 +1246,120 @@ func _snap_to_terrain() -> void:
 		var result = space_state.intersect_ray(query)
 		if result:
 			global_position = result.position + Vector3.UP
+
+func _build_simulated_character() -> void:
+	if mesh and mesh.get_child_count() > 2: return
+	
+	var target_player = get_tree().get_first_node_in_group("local_player")
+	if not target_player:
+		for p in get_tree().get_nodes_in_group("player"):
+			if p.name == "1" or p.is_multiplayer_authority():
+				if p != self: # Don't mirror ourselves
+					target_player = p
+					break
+	
+	if not target_player:
+		_build_fallback_bot()
+		return
+		
+	# Manual search following the tree map: Visuals -> Idle -> Skeleton3D
+	var source_rig = target_player.get_node_or_null("Visuals")
+	if not source_rig:
+		# Search manually if not at standard path
+		for child in target_player.get_children():
+			if "Visuals" in child.name or "Idle" in child.name:
+				source_rig = child
+				break
+	
+	if source_rig:
+		print("[PlayerController] SUCCESS: Mirroring rig '", source_rig.name, "' from player.")
+		for child in mesh.get_children():
+			child.free()
+		
+		var clone = source_rig.duplicate()
+		mesh.add_child(clone)
+		clone.position = Vector3.ZERO
+		clone.visible = true
+		
+		# Link AnimationPlayer (usually inside the clone now)
+		var anims = clone.find_children("*", "AnimationPlayer", true)
+		if anims.size() > 0:
+			animation_player = anims[0]
+			animation_player.play("player/idle")
+			
+		self.char_name = "Shadow " + target_player.char_name
+		self.char_race = target_player.char_race
+		self.char_class = target_player.char_class
+	else:
+		printerr("[PlayerController] Mirror Failed despite tree map. Falling back.")
+		_build_fallback_bot()
+
+	# HUD Sync - Force the card to appear
+	var hud = get_tree().get_first_node_in_group("hud")
+	if hud:
+		var data = {
+			"name": char_name,
+			"appearance": {"race": char_race, "class": char_class},
+			"class": char_class
+		}
+		if hud.has_method("_on_network_sync"):
+			hud._on_network_sync(name.to_int(), data)
+		elif hud.has_method("add_party_member"):
+			hud.add_party_member(name.to_int(), char_name, char_class)
+
+func _print_node_tree(node: Node, indent: String) -> void:
+	print(indent, node.name, " (", node.get_class(), ")")
+	for child in node.get_children():
+		_print_node_tree(child, indent + "  ")
+
+func _build_fallback_bot() -> void:
+	if not mesh: return
+	print("[PlayerController] Building fallback capsule for bot.")
+	for child in mesh.get_children():
+		if child is MeshInstance3D or child.name.begins_with("Rig"):
+			child.free()
+			
+	var mi = MeshInstance3D.new()
+	mi.mesh = CapsuleMesh.new()
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color.MAGENTA
+	mi.material_override = mat
+	mesh.add_child(mi)
+
+func _update_ai(delta: float) -> void:
+	if not ai_target:
+		# Try to find local player as target
+		ai_target = get_tree().get_first_node_in_group("local_player")
+		return
+		
+	var dist = global_position.distance_to(ai_target.global_position)
+	if dist > 40.0: return # Don't process if too far
+	
+	var dir = (ai_target.global_position - global_position).normalized()
+	dir.y = 0
+	
+	if dist > 4.0:
+		velocity = velocity.lerp(dir * walk_speed, acceleration * delta)
+		look_at(global_position + dir, Vector3.UP)
+	else:
+		velocity = velocity.lerp(Vector3.ZERO, friction * delta)
+		
+	if not is_on_floor():
+		velocity.y -= 9.8 * delta
+		
+	move_and_slide()
+	
+	# Bot Visual Safety Check (Less aggressive)
+	if Engine.get_frames_drawn() % 60 == 0:
+		if not mesh or mesh.get_child_count() == 0:
+			_build_simulated_character()
+		elif not mesh.visible:
+			mesh.show()
+
+	# Random Practice Swing
+	ai_timer += delta
+	if ai_timer > 5.0:
+		ai_timer = 0.0
+		if combat_system and combat_system.has_method("cast_active_spell"):
+			combat_system.cast_active_spell()
 			print("[Player] Snapped via raycast to: ", global_position)

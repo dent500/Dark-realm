@@ -47,11 +47,12 @@ func _ready() -> void:
 		if multiplayer.is_server():
 			_load_map()
 		else:
-			# If we are a client, wait for the NetworkManager to signal that player data is synced
-			# before we even attempt to load the map, ensuring we have the correct floor ID.
-			if NetworkManager.peer_data.has(1):
-				_on_initial_sync_ready()
-			else:
+			print("[MapLoader] Client ready. Loading local floor placeholder and requesting sync...")
+			_load_map()
+			request_map_sync.rpc_id(1)
+			
+			# Also listen for data sync just in case
+			if not NetworkManager.player_data_synced.is_connected(_on_peer_data_received):
 				NetworkManager.player_data_synced.connect(_on_peer_data_received)
 	else:
 		call_deferred("_load_map")
@@ -83,12 +84,24 @@ func request_map_sync() -> void:
 	if not multiplayer.is_server(): return
 	var sender_id = multiplayer.get_remote_sender_id()
 	print("[MapLoader] Peer ", sender_id, " requested map sync. Sending Floor: ", PlayerData.dungeon_floor)
-	load_map_networked.rpc_id(sender_id, PlayerData.dungeon_floor)
+	load_map_networked.rpc(PlayerData.dungeon_floor)
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func load_map_networked(floor_id: int) -> void:
-	if PlayerData.dungeon_floor != floor_id:
-		print("[MapLoader] Floor mismatch (Sync: ", floor_id, " Local: ", PlayerData.dungeon_floor, "). Reloading.")
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id != 0 and not multiplayer.is_server() and sender_id != 1:
+		return
+	var has_actual_level = false
+	for child in get_children():
+		if child.name.contains("Level") or child.name.contains("map") or child.has_node("ProceduralTerrain"):
+			has_actual_level = true
+			break
+
+	if PlayerData.dungeon_floor != floor_id or not has_actual_level:
+		if PlayerData.dungeon_floor != floor_id:
+			print("[MapLoader] Floor mismatch (Sync: ", floor_id, " Local: ", PlayerData.dungeon_floor, "). Reloading.")
+		else:
+			print("[MapLoader] Level missing on client. Loading floor: ", floor_id)
 		PlayerData.dungeon_floor = floor_id
 		_load_map()
 	else:
@@ -99,7 +112,14 @@ func _build_materials() -> void:
 	mat_stone = StandardMaterial3D.new()
 	
 	# Load the custom texture if available
-	var tex = load("res://assets/textures/wall.jpeg")
+	var tex_path = "res://assets/textures/wall.jpeg"
+	var tex = load(tex_path)
+	
+	if not tex and ResourceLoader.exists(tex_path):
+		var img = Image.load_from_file(ProjectSettings.globalize_path(tex_path))
+		if img:
+			tex = ImageTexture.create_from_image(img)
+
 	if tex:
 		mat_stone.albedo_texture = tex
 		mat_stone.albedo_color = Color(1, 1, 1) # Reset color so texture isn't tinted dark

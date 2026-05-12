@@ -176,7 +176,8 @@ func _try_link_terrain_map() -> void:
 		world_size = get_tree().get_meta("terrain_map_size")
 		print("[HUD] Success: Terrain map linked. Map size: ", world_size)
 	else:
-		print("[HUD] Waiting for terrain map texture...")
+		# Map texture not ready yet
+		pass
 
 func _process(delta: float) -> void:
 	# Safety check for map texture recovery
@@ -318,9 +319,20 @@ func _refresh_quest_tracker(_id: String) -> void:
 func _refresh_quest_tracker_stage(_id: String, _stage: int) -> void:
 	_refresh_quest_tracker(_id)
 
-func _on_quest_completed(quest_id: String) -> void:
-	_refresh_quest_tracker(quest_id)
-	_show_completion_banner(QuestManager.quest_db.get(quest_id, {}).get("title", "Quest"))
+func _on_quest_completed(q_id: String) -> void:
+	_refresh_quest_tracker("")
+	# Note: Assuming system_message logic exists or placeholder
+	# system_message("Quest Completed: " + QuestManager.get_quest_title(q_id))
+	_show_completion_banner(QuestManager.quest_db.get(q_id, {}).get("title", "Quest"))
+
+func show_error_popup(title: String, message: String) -> void:
+	var dialog = AcceptDialog.new()
+	dialog.title = title
+	dialog.dialog_text = message
+	dialog.exclusive = true
+	dialog.z_index = 200
+	add_child(dialog)
+	dialog.popup_centered()
 
 func _show_completion_banner(title: String) -> void:
 	var banner = Label.new()
@@ -731,6 +743,15 @@ func _build_dynamic_panels() -> void:
 	sync_btn.add_theme_color_override("font_color", Color.YELLOW)
 	sync_btn.pressed.connect(_on_force_sync_pressed)
 	vbox.add_child(sync_btn)
+	
+	# Simulated Player Bot (for testing)
+	var bot_btn = Button.new()
+	bot_btn.text = "➕  ADD SIMULATED PLAYER"
+	bot_btn.custom_minimum_size = Vector2(0, 50)
+	bot_btn.add_theme_font_size_override("font_size", 20)
+	bot_btn.add_theme_color_override("font_color", Color.CYAN)
+	bot_btn.pressed.connect(_on_simulate_bot_pressed)
+	vbox.add_child(bot_btn)
 	
 	var legend_lbl = RichTextLabel.new()
 	legend_lbl.bbcode_enabled = true
@@ -1512,6 +1533,13 @@ func _on_force_sync_pressed() -> void:
 	var wm = get_tree().get_first_node_in_group("world_manager")
 	if wm and wm.has_method("force_manual_sync"):
 		wm.force_manual_sync()
+
+func _on_simulate_bot_pressed() -> void:
+	print("[HUD] Simulated Bot Requested.")
+	var wm = get_tree().get_first_node_in_group("world_manager")
+	if wm and wm.has_method("spawn_simulated_peer"):
+		wm.spawn_simulated_peer()
+		toggle_panel("pause_menu") # Close menu to see the bot
 
 func _on_network_sync(id: int, _data: Dictionary) -> void:
 	if id == multiplayer.get_unique_id():

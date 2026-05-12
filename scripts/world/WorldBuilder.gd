@@ -207,12 +207,10 @@ func _build_forest_path() -> void:
 # ─── EXTRA ENEMY SPAWNS scattered around the open world ──────────────────────
 func _build_extra_enemies() -> void:
 	for pos in [
-		Vector3(15, 1, 5), Vector3(-18, 1, 5),
-		Vector3(8,  1, 18), Vector3(-10, 1, 20),
 		Vector3(22, 1, 15), Vector3(-22, 1, -5),
-		Vector3(0, 1, 10), Vector3(35, 1, -15),
-		Vector3(-35, 1, -25), Vector3(10, 1, -40),
-		Vector3(-10, 1, -40), Vector3(0, 1, -50)
+		Vector3(35, 1, -15), Vector3(-35, 1, -25),
+		Vector3(10, 1, -40), Vector3(-10, 1, -40),
+		Vector3(0, 1, -50)
 	]:
 		_spawn_enemy(pos)
 

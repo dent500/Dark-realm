@@ -16,7 +16,7 @@ var _confirmation_dialog: ConfirmationDialog
 var _settings_popup: AcceptDialog
 
 # ─── New Flow State ───
-enum MenuState { LAUNCHER, CHARACTER_SELECT }
+enum MenuState { LAUNCHER, CHARACTER_SELECT, LOBBY }
 enum GameMode { SINGLE, MULTI }
 
 var _current_state: MenuState = MenuState.LAUNCHER
@@ -32,6 +32,14 @@ var _status_lbl: Label
 var _steam_user_lbl: Label
 var _version_lbl: Label
 var _update_btn: Button
+
+# Lobby UI
+var _lobby_ui: Control
+var _lobby_player_list: VBoxContainer
+var _lobby_chat_log: RichTextLabel
+var _lobby_chat_input: LineEdit
+var _lobby_id_lbl: Label
+
 
 func _ready() -> void:
 	print("[MainMenu] Starting initialization...")
@@ -62,6 +70,19 @@ func _ready() -> void:
 	
 	if not NetworkManager.lobby_id_received.is_connected(_on_lobby_id_received):
 		NetworkManager.lobby_id_received.connect(_on_lobby_id_received)
+	
+	if not NetworkManager.chat_message_received.is_connected(_on_lobby_chat_received):
+		NetworkManager.chat_message_received.connect(_on_lobby_chat_received)
+	
+	if not NetworkManager.peer_connected.is_connected(_on_lobby_peer_updated):
+		NetworkManager.peer_connected.connect(_on_lobby_peer_updated)
+		
+	if not NetworkManager.peer_disconnected.is_connected(_on_lobby_peer_updated):
+		NetworkManager.peer_disconnected.connect(_on_lobby_peer_updated)
+
+	if not NetworkManager.player_data_synced.is_connected(_on_lobby_peer_updated):
+		NetworkManager.player_data_synced.connect(_on_lobby_peer_updated)
+
 	
 	if not UpdateManager.update_check_completed.is_connected(_on_update_check_finished):
 		UpdateManager.update_check_completed.connect(_on_update_check_finished)
@@ -320,6 +341,9 @@ func _integrate_ui_to_main_vbox() -> void:
 	_status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status_lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
 	_character_ui.add_child(_status_lbl)
+	
+	_setup_lobby_ui()
+
 
 func _create_menu_button(txt: String, base_color: Color) -> Button:
 	var btn = Button.new()
@@ -342,22 +366,39 @@ func _set_menu_state(state: MenuState) -> void:
 	_current_state = state
 	match _current_state:
 		MenuState.LAUNCHER:
+			main_vbox.show()
 			_launcher_ui.show()
 			_character_ui.hide()
 			title_area.show()
-			# Cinematic effect: Hide characters in the launcher stage
 			for p in _podiums_data:
 				if is_instance_valid(p["anchor"]): p["anchor"].hide()
 			if _selection_light: _selection_light.hide()
+			if has_node("LobbyBlur"): get_node("LobbyBlur").hide()
 		MenuState.CHARACTER_SELECT:
+			main_vbox.show()
 			_launcher_ui.hide()
 			_character_ui.show()
+			if _lobby_ui: _lobby_ui.hide()
 			title_area.hide()
 			# Restore characters
 			for p in _podiums_data:
 				if is_instance_valid(p["anchor"]): p["anchor"].show()
 			if _selection_light: _selection_light.show()
+			if has_node("LobbyBlur"): get_node("LobbyBlur").hide()
 			_update_ui_state()
+		MenuState.LOBBY:
+			_launcher_ui.hide()
+			_character_ui.hide()
+			main_vbox.hide() # Hide the main menu stack
+			if _lobby_ui: _lobby_ui.show()
+			if has_node("LobbyBlur"): get_node("LobbyBlur").show()
+			title_area.hide()
+			# Hide characters in lobby to focus on UI
+			for p in _podiums_data:
+				if is_instance_valid(p["anchor"]): p["anchor"].hide()
+			if _selection_light: _selection_light.hide()
+			_refresh_lobby_player_list()
+
 
 func _on_mode_selected(mode: GameMode) -> void:
 	_current_mode = mode
@@ -449,6 +490,227 @@ func _build_pedestal(parent: Node3D, slot_idx: int, pos_x: float, info: Dictiona
 		tween.tween_property(ghost, "position:y", 0.8, 2.0).set_trans(Tween.TRANS_SINE)
 	return anchor
 
+func _setup_lobby_ui() -> void:
+	# 1. Background Blur Overlay
+	var blur_rect = ColorRect.new()
+	blur_rect.name = "LobbyBlur"
+	blur_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var blur_mat = ShaderMaterial.new()
+	var blur_shader = Shader.new()
+	blur_shader.code = "shader_type canvas_item;
+		uniform float lod: hint_range(0.0, 5.0) = 2.5;
+		uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
+		void fragment(){
+			COLOR = textureLod(screen_texture, SCREEN_UV, lod);
+			COLOR.rgb *= 0.6; // Darken slightly
+		}"
+	blur_mat.shader = blur_shader
+	blur_rect.material = blur_mat
+	add_child(blur_rect) # Add to root, not main_vbox
+	blur_rect.hide()
+	
+	_lobby_ui = Panel.new()
+	_lobby_ui.name = "LobbyUI"
+	var glass_style = StyleBoxFlat.new()
+	glass_style.bg_color = Color(0.08, 0.08, 0.12, 0.6) # Slightly darker for contrast
+	glass_style.border_width_left = 1; glass_style.border_width_top = 1
+	glass_style.border_width_right = 1; glass_style.border_width_bottom = 1
+	glass_style.border_color = Color(1, 1, 1, 0.15)
+	glass_style.set_corner_radius_all(15)
+	_lobby_ui.add_theme_stylebox_override("panel", glass_style)
+	
+	_lobby_ui.set_anchors_preset(Control.PRESET_CENTER)
+	_lobby_ui.offset_left = -550
+	_lobby_ui.offset_top = -350
+	_lobby_ui.offset_right = 550
+	_lobby_ui.offset_bottom = 350
+	add_child(_lobby_ui)
+	_lobby_ui.hide()
+	
+	# Main layout container
+	var margin = MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 30)
+	margin.add_theme_constant_override("margin_top", 30)
+	margin.add_theme_constant_override("margin_right", 30)
+	margin.add_theme_constant_override("margin_bottom", 30)
+	_lobby_ui.add_child(margin)
+	
+	var main_layout = VBoxContainer.new()
+	main_layout.add_theme_constant_override("separation", 25)
+	margin.add_child(main_layout)
+	
+	# Header Area
+	var header = VBoxContainer.new()
+	main_layout.add_child(header)
+	
+	var title = Label.new()
+	title.text = "✦ DARK REALM LOBBY ✦"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 38)
+	title.add_theme_color_override("font_color", Color(0.95, 0.85, 0.6))
+	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	title.add_theme_constant_override("shadow_offset_y", 3)
+	header.add_child(title)
+	
+	_lobby_id_lbl = Label.new()
+	_lobby_id_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lobby_id_lbl.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))
+	_lobby_id_lbl.add_theme_font_size_override("font_size", 16)
+	header.add_child(_lobby_id_lbl)
+	
+	# Content Area (Two Columns)
+	var content_hbox = HBoxContainer.new()
+	content_hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content_hbox.add_theme_constant_override("separation", 30)
+	main_layout.add_child(content_hbox)
+	
+	# Left: Player List
+	var left_vbox = VBoxContainer.new()
+	left_vbox.custom_minimum_size = Vector2(320, 0)
+	content_hbox.add_child(left_vbox)
+	
+	var pl_title = Label.new()
+	pl_title.text = "PARTY MEMBERS"
+	pl_title.add_theme_font_size_override("font_size", 18)
+	pl_title.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	left_vbox.add_child(pl_title)
+	
+	var pl_scroll = ScrollContainer.new()
+	pl_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left_vbox.add_child(pl_scroll)
+	
+	_lobby_player_list = VBoxContainer.new()
+	_lobby_player_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lobby_player_list.add_theme_constant_override("separation", 8)
+	pl_scroll.add_child(_lobby_player_list)
+	
+	# Right: Chat
+	var right_vbox = VBoxContainer.new()
+	right_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content_hbox.add_child(right_vbox)
+	
+	var chat_title = Label.new()
+	chat_title.text = "COUNCIL CHAT"
+	chat_title.add_theme_font_size_override("font_size", 18)
+	chat_title.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	right_vbox.add_child(chat_title)
+	
+	var chat_style = glass_style.duplicate()
+	chat_style.bg_color = Color(0, 0, 0, 0.4)
+	
+	_lobby_chat_log = RichTextLabel.new()
+	_lobby_chat_log.bbcode_enabled = true
+	_lobby_chat_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_lobby_chat_log.add_theme_stylebox_override("normal", chat_style)
+	_lobby_chat_log.scroll_following = true
+	right_vbox.add_child(_lobby_chat_log)
+	
+	_lobby_chat_input = LineEdit.new()
+	_lobby_chat_input.placeholder_text = "Send a message..."
+	_lobby_chat_input.text_submitted.connect(_on_lobby_chat_submitted)
+	_lobby_chat_input.add_theme_stylebox_override("normal", chat_style)
+	right_vbox.add_child(_lobby_chat_input)
+	
+	# Footer Buttons
+	var footer = HBoxContainer.new()
+	footer.add_theme_constant_override("separation", 15)
+	footer.alignment = BoxContainer.ALIGNMENT_CENTER
+	main_layout.add_child(footer)
+	
+	var enter_btn = _create_menu_button("🚀 Enter World", Color(0.12, 0.45, 0.25))
+	enter_btn.custom_minimum_size = Vector2(280, 0)
+	enter_btn.pressed.connect(func(): GameManager.enter_world())
+	footer.add_child(enter_btn)
+	
+	var copy_btn = _create_menu_button("📋 Copy ID", Color(0.25, 0.25, 0.3))
+	copy_btn.custom_minimum_size = Vector2(160, 0)
+	copy_btn.pressed.connect(func(): 
+		DisplayServer.clipboard_set(str(NetworkManager.lobby_id))
+		copy_btn.text = "✅ Copied"
+		await get_tree().create_timer(2.0).timeout
+		copy_btn.text = "📋 Copy ID"
+	)
+	footer.add_child(copy_btn)
+	
+	var leave_btn = _create_menu_button("« Leave", Color(0.4, 0.1, 0.1))
+	leave_btn.custom_minimum_size = Vector2(160, 0)
+	leave_btn.pressed.connect(func(): 
+		NetworkManager.shutdown()
+		_set_menu_state(MenuState.CHARACTER_SELECT)
+	)
+	footer.add_child(leave_btn)
+
+func _refresh_lobby_player_list() -> void:
+	if not _lobby_player_list: return
+	for child in _lobby_player_list.get_children(): child.queue_free()
+	
+	# Local Player
+	_add_player_to_list(1, PlayerData.to_dict())
+	
+	# Peers
+	for id in NetworkManager.peer_data:
+		if id != 1:
+			_add_player_to_list(id, NetworkManager.peer_data[id])
+
+func _add_player_to_list(id: int, data: Dictionary) -> void:
+	var item = PanelContainer.new()
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(1, 1, 1, 0.05)
+	style.set_corner_radius_all(6)
+	item.add_theme_stylebox_override("panel", style)
+	
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	item.add_child(margin)
+	
+	var hbox = HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 15)
+	margin.add_child(hbox)
+	
+	var status_dot = ColorRect.new()
+	status_dot.custom_minimum_size = Vector2(8, 8)
+	status_dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	status_dot.color = Color(0.4, 1.0, 0.4) if id == 1 else Color(0.4, 0.8, 1.0)
+	hbox.add_child(status_dot)
+	
+	var name_lbl = Label.new()
+	var n_text = data.get("character_name", "Unknown Hero")
+	if id == 1: n_text += " [Host]"
+	elif id == multiplayer.get_unique_id(): n_text += " [You]"
+	name_lbl.text = n_text
+	name_lbl.add_theme_font_size_override("font_size", 16)
+	name_lbl.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	hbox.add_child(name_lbl)
+	
+	var info_lbl = Label.new()
+	info_lbl.text = "Lv." + str(data.get("level", 1)) + " " + data.get("char_class", "")
+	info_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	info_lbl.add_theme_font_size_override("font_size", 13)
+	info_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+	hbox.add_child(info_lbl)
+	
+	_lobby_player_list.add_child(item)
+
+func _on_lobby_chat_submitted(text: String) -> void:
+	if text.strip_edges() == "": return
+	_lobby_chat_input.clear()
+	NetworkManager.send_chat_message(text)
+
+func _on_lobby_chat_received(sender: String, message: String, color: Color) -> void:
+	if _lobby_chat_log:
+		var hex = color.to_html(false)
+		_lobby_chat_log.append_text("[color=#%s]%s:[/color] %s\n" % [hex, sender, message])
+
+func _on_lobby_peer_updated(_id: int) -> void:
+	if _current_state == MenuState.LOBBY:
+		_refresh_lobby_player_list()
+
+
 func _focus_slot(slot_idx: int, transition_time: float = 0.5) -> void:
 	_selected_slot = slot_idx
 	var slot_data = null
@@ -525,9 +787,11 @@ func _on_host_pressed() -> void:
 	SaveSystem.load_game(_selected_slot)
 	
 	is_hosting_attempt = true
+	NetworkManager.shutdown() # Clean up any existing state
 	var err = NetworkManager.host_game()
 	if err == OK:
 		_status_lbl.text = "Creating Steam Lobby..."
+
 
 # This is now handled within _on_lobby_id_received for reliability
 
@@ -556,41 +820,22 @@ func _on_connection_success() -> void:
 	# Clean up signals
 	if NetworkManager.connection_succeeded.is_connected(_on_connection_success):
 		NetworkManager.connection_succeeded.disconnect(_on_connection_success)
-	GameManager.enter_world()
+	_set_menu_state(MenuState.LOBBY)
 
 func _on_connection_fail() -> void:
 	_status_lbl.text = "Connection Failed!"
 	if NetworkManager.connection_failed.is_connected(_on_connection_fail):
 		NetworkManager.connection_failed.disconnect(_on_connection_fail)
 
+
 func _on_lobby_id_received(l_id: int) -> void:
 	print("[DEBUG] LOBBY READY: ", l_id, " | Hosting: ", is_hosting_attempt)
-	_status_lbl.text = "Lobby Created! ID: " + str(l_id)
-	
-	# Add the "Enter World" button to the bottom area
-	var enter_btn = _create_menu_button("🚀 ENTER WORLD", Color(0.2, 0.5, 0.3))
-	enter_btn.custom_minimum_size = Vector2(0, 50)
-	enter_btn.pressed.connect(func(): 
-		_status_lbl.text = "Entering world..."
-		GameManager.enter_world()
-	)
-	_character_ui.add_child(enter_btn)
-	# Move it to just above the "Back to Menu" button (which is usually the last child)
-	_character_ui.move_child(enter_btn, _character_ui.get_child_count() - 2)
-	
-	# Add the Copy button below it
-	var copy_btn = _create_menu_button("📋 Copy Lobby ID", Color(0.3, 0.3, 0.3))
-	copy_btn.custom_minimum_size = Vector2(0, 40)
-	copy_btn.pressed.connect(func(): 
-		DisplayServer.clipboard_set(str(l_id))
-		copy_btn.text = "✅ ID Copied!"
-	)
-	_character_ui.add_child(copy_btn)
-	_character_ui.move_child(copy_btn, _character_ui.get_child_count() - 2)
+	if _lobby_id_lbl: _lobby_id_lbl.text = "Lobby ID: " + str(l_id)
 	
 	if is_hosting_attempt:
 		is_hosting_attempt = false
-		_status_lbl.text = "Lobby Ready! Use the buttons below to start."
+		_set_menu_state(MenuState.LOBBY)
+
 
 func _on_delete_confirmed() -> void:
 	SaveSystem.delete_save(_selected_slot)

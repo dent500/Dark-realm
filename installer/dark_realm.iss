@@ -1,7 +1,7 @@
 [Setup]
 AppId={{C6E2A341-DA1A-4C5A-9473-4CBA599542FB}}
 AppName=Dark Realm
-AppVersion=1.0.2
+AppVersion=1.0.0
 AppPublisher=Antigravity
 DefaultDirName={autopf}\Dark Realm
 DefaultGroupName=Dark Realm

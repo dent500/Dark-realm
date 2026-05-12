@@ -18,19 +18,12 @@ var auto_save_timer: float = 0.0
 var current_weather: String = "clear"
 var weather_timer: float = 0.0
 var weather_duration: float = 60.0
-var watchdog_timer: Timer
+
 
 # ─── Lifecycle ────────────────────────────────────────────────────────────────
 func _ready() -> void:
+	print("=== [WorldManager] _ready() v2 LOADED — script is up to date ===")
 	add_to_group("world_manager")
-	
-	# Start the Visibility Watchdog to ensure everyone is spawned and visible
-	watchdog_timer = Timer.new()
-	watchdog_timer.wait_time = 3.0 # Check every 3 seconds
-	watchdog_timer.autostart = true
-	watchdog_timer.timeout.connect(_on_watchdog_timeout)
-	add_child(watchdog_timer)
-	print("[WorldManager] Visibility Watchdog started.")
 	
 	# Handle disconnections
 	NetworkManager.peer_disconnected.connect(_on_peer_disconnected)
@@ -56,10 +49,83 @@ func _ready() -> void:
 		env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	# Initial AI narration for zone arrival
 	AIDungeonMaster.narrate_arrival(PlayerData.current_zone)
+	# ─── Essential World Nodes ────────────────────────────────────────────────────
+	_ensure_essential_world_nodes()
+	
+	# ─── Networking Initialization ───────────────────────────────────────────────
+	if multiplayer.multiplayer_peer:
+		_run_network_init()
+		
 
-	# ─── Restore Skeletons ───
-	if multiplayer.is_server() or not NetworkManager.is_multiplayer_active():
-		_ensure_essential_world_nodes()
+	var peer = multiplayer.multiplayer_peer
+	var conn_status: int = MultiplayerPeer.CONNECTION_DISCONNECTED
+	if peer != null:
+		conn_status = peer.get_connection_status()
+	
+	if conn_status == MultiplayerPeer.CONNECTION_DISCONNECTED:
+		# No active peer — singleplayer
+		_spawn_player()
+	elif conn_status == MultiplayerPeer.CONNECTION_CONNECTED:
+		# Already fully connected (host or very fast client)
+		pass
+	else:
+		# STATUS = CONNECTION_CONNECTING — P2P handshake in progress
+		print("[WorldManager] Steam P2P connecting. Waiting for handshake signal...")
+		if not multiplayer.connected_to_server.is_connected(_on_p2p_connected_to_server):
+			multiplayer.connected_to_server.connect(_on_p2p_connected_to_server, CONNECT_ONE_SHOT)
+		
+		# Robustness Fallback: Poll every 0.5s for 5s in case we missed the signal
+		# (Signals can sometimes be lost during scene transitions if timing is tight)
+		_poll_for_connection_success(0)
+
+func _poll_for_connection_success(retry_count: int) -> void:
+	if retry_count > 10: # 5 seconds max
+		printerr("[WorldManager] ERROR: P2P handshake timeout after 5s.")
+		if not NetworkManager.is_multiplayer_active():
+			_spawn_player()
+		return
+		
+	if NetworkManager.is_multiplayer_active():
+		if multiplayer.connected_to_server.is_connected(_on_p2p_connected_to_server):
+			multiplayer.connected_to_server.disconnect(_on_p2p_connected_to_server)
+		print("[WorldManager] Connection confirmed via polling fallback.")
+		_run_network_init()
+		return
+		
+	await get_tree().create_timer(0.5).timeout
+	_poll_for_connection_success(retry_count + 1)
+
+func _on_p2p_connected_to_server() -> void:
+	print("[WorldManager] P2P handshake complete. Running client network init.")
+	_run_network_init()
+
+func _run_network_init() -> void:
+	var my_id = multiplayer.get_unique_id()
+	print("[WorldManager] Running network init for peer: ", my_id)
+	
+	# 1. Spawn OURSELVES locally immediately
+	_spawn_player_multi(my_id)
+	
+	# 2. Spawn any peers we already know about from NetworkManager
+	# Specifically ensure the host (1) is checked first
+	if 1 in NetworkManager.peer_data and my_id != 1:
+		_spawn_player_multi(1)
+		
+	for peer_id in NetworkManager.peer_data:
+		if peer_id != my_id and peer_id != 1:
+			_spawn_player_multi(peer_id)
+	
+	# 3. If we are NOT the server, notify the server that we are ready to receive spawn data
+	if not multiplayer.is_server():
+		print("[WorldManager] Client ready. Notifying server and waiting for sync data...")
+		notify_server_ready.rpc_id(1)
+	else:
+		# Server-specific listeners
+		if not multiplayer.peer_connected.is_connected(_on_peer_connected):
+			multiplayer.peer_connected.connect(_on_peer_connected)
+		if not multiplayer.peer_disconnected.is_connected(_despawn_player):
+			multiplayer.peer_disconnected.connect(_despawn_player)
+
 
 func _ensure_essential_world_nodes() -> void:
 	# Ensure WaveManager is active for endless skeleton waves
@@ -75,7 +141,6 @@ func _ensure_essential_world_nodes() -> void:
 		var wb = Node3D.new()
 		wb.name = "WorldBuilder"
 		wb.set_script(load("res://scripts/world/WorldBuilder.gd"))
-		# Assign the enemy scene (using the same one from MapLoader if possible)
 		var loader = get_node_or_null("MapLoader")
 		if loader and "enemy_scene" in loader:
 			wb.enemy_scene = loader.enemy_scene
@@ -84,64 +149,29 @@ func _ensure_essential_world_nodes() -> void:
 		add_child(wb)
 		print("[WorldManager] WorldBuilder initialized.")
 
-	# Networking Initialization
-	if NetworkManager.is_multiplayer_active():
-		if multiplayer.is_server():
-			print("[WorldManager] Server initializing. Spawning host player.")
-			_spawn_player_multi(1)
-			# IMPORTANT: The server waits for the client to say they are ready before spawning
-			if not multiplayer.peer_connected.is_connected(_on_peer_connected):
-				multiplayer.peer_connected.connect(_on_peer_connected)
-			if not multiplayer.peer_disconnected.is_connected(_despawn_player):
-				multiplayer.peer_disconnected.connect(_despawn_player)
-		else:
-			print("[WorldManager] Client world ready. Notifying server...")
-			# Notify server that we are ready to be spawned
-			notify_server_ready.rpc_id(1)
-
-	else:
-		# Spawn player at last saved position (Singleplayer)
-		_spawn_player()
-
 func _on_peer_connected(id: int) -> void:
 	print("[WorldManager] Peer connected: ", id, ". Waiting for ready signal...")
 
-@rpc("any_peer", "call_local", "reliable")
+# Only runs on the server — do NOT use call_local here
+@rpc("any_peer", "reliable")
 func notify_server_ready() -> void:
+	if not multiplayer.is_server(): return
 	var id = multiplayer.get_remote_sender_id()
-	print("[WorldManager] Peer ", id, " is ready. Spawning player and syncing others...")
+	print("[WorldManager] Peer ", id, " is ready. Pushing full spawn and data relay...")
+	
+	# 1. First, send ALL known appearance data (including the host/server itself)
+	# This ensures the client can resolve the character rigs for everyone
+	NetworkManager.register_player_from_server.rpc_id(id, 1, PlayerData.to_dict())
+	
+	for p_id in NetworkManager.peer_data:
+		if p_id != id: # No need to send the requester's own data back to them
+			NetworkManager.register_player_from_server.rpc_id(id, p_id, NetworkManager.peer_data[p_id])
+	
+	# 2. Spawn the actual node on the server
+	# The MultiplayerSpawner will replicate this to the client automatically
 	_spawn_player_multi(id)
-	
-	# RECOVERY STEP: 
-	# 1. Resend all EXISTING players to this new peer
-	for p in get_tree().get_nodes_in_group("player"):
-		var p_id = int(p.name.replace("@", "").replace("Player", ""))
-		if p_id > 0 and p_id != id:
-			var data = NetworkManager.peer_data.get(p_id, {})
-			if not data.is_empty():
-				NetworkManager.register_player_from_server.rpc_id(id, p_id, data)
-				print("[WorldManager] Relaying existing peer ", p_id, " to new peer ", id)
-	
-	# 2. Tell ALL peers (including host) to verify their view of this NEW player
-	# This ensures the 4th player doesn't stay invisible
-	for peer_id in multiplayer.get_peers():
-		var data = NetworkManager.peer_data.get(id, {})
-		NetworkManager.register_player_from_server.rpc_id(peer_id, id, data)
 
-func _on_watchdog_timeout() -> void:
-	# Only spawn missing nodes if absolutely necessary
-	# Using peer_data as the source of truth for who SHOULD be here
-	for peer_id in NetworkManager.peer_data:
-		if peer_id != multiplayer.get_unique_id():
-			ensure_player_spawned(peer_id)
-			
-	# If we are missing players relative to what the HUD party list says, request a fresh relay
-	var player_count = get_tree().get_nodes_in_group("player").size()
-	var data_count = NetworkManager.peer_data.size() + 1
-	
-	if player_count < data_count:
-		print("[WorldManager] WATCHDOG: Mismatch detected (", player_count, "/", data_count, "). Auto-Relaying...")
-		NetworkManager.request_player_relay.rpc_id(1)
+
 
 func _on_peer_disconnected(id: int) -> void:
 	print("[WorldManager] Peer ", id, " disconnected. Cleaning up node.")
@@ -151,11 +181,16 @@ func _on_peer_disconnected(id: int) -> void:
 
 func _process(delta: float) -> void:
 	_update_sun_position()
+	
+
+
 	_update_auto_save(delta)
 	if enable_weather:
 		_update_weather(delta)
 
 # ─── Player Spawning ──────────────────────────────────────────────────────────
+
+
 func _spawn_player() -> void:
 	# Singleplayer spawning
 	var player_scene = load("res://scenes/player.tscn")
@@ -197,70 +232,100 @@ func force_manual_sync() -> void:
 	
 func ensure_player_spawned(id: int) -> void:
 	var players_node = get_node_or_null("Players")
-	if not players_node: return
 	
-	if not players_node.has_node(str(id)):
-		print("[WorldManager] WATCHDOG RECOVERY: Spawning node for peer ", id)
+	if not players_node or not players_node.has_node(str(id)):
+		print("[WorldManager] ensure_player_spawned: Triggering spawn for peer ", id)
 		_spawn_player_multi(id)
 
-func _spawn_player_multi(id: int) -> void:
-	# Server handles the spawn and broadcasts it to everyone manually
-	if multiplayer.is_server():
-		_do_spawn.rpc(id)
-	else:
-		# Clients can spawn themselves locally if they know about the peer
-		_do_spawn(id)
 
-@rpc("authority", "call_local", "reliable")
-func _do_spawn(id: int) -> void:
-	var players_node = get_node_or_null("Players")
-	if not players_node: return
+func _spawn_player_multi(id: int) -> void:
+	print("[WorldManager] _spawn_player_multi called for peer: ", id, " (Am Server: ", multiplayer.is_server(), ")")
+	if not multiplayer.is_server():
+		return # Clients should never spawn players manually when using MultiplayerSpawner
+		
+	if not has_node("Players"):
+		var p_node = Node3D.new()
+		p_node.name = "Players"
+		add_child(p_node)
+		print("[WorldManager] Created 'Players' container.")
 	
-	# Safety check to avoid double-spawning
-	if players_node.has_node(str(id)): 
-		print("[WorldManager] Player ", id, " already exists. Skipping spawn.")
+	var players_node = get_node("Players")
+	if players_node.has_node(str(id)):
+		print("[WorldManager] Node already exists for peer ", id, ". Skipping.")
 		return
-	
-	print("[WorldManager] Manual RPC Spawning player for peer: ", id)
+		
 	var player_scene = load("res://scenes/player.tscn")
 	var player = player_scene.instantiate()
 	player.name = str(id)
 	
-	# Set authority immediately
-	player.set_multiplayer_authority(id)
+	# Detect if this is a simulated bot ID (9000-9999) BEFORE adding to tree
+	if id >= 9000 and id < 10000:
+		if "is_simulated" in player:
+			player.is_simulated = true
+			print("[WorldManager] Bot identity confirmed for: ", id)
 	
-	# Safe Spawn: Add a small random offset to prevent physics explosions (flying into sky)
-	var offset = Vector3(randf_range(-1.5, 1.5), 0, randf_range(-1.5, 1.5))
-	player.position = Vector3(30, 10, -20) + offset 
+	# Spawn HIGH to avoid falling through terrain while it generates
+	player.global_position = Vector3(0, 150, 0)
 	
+	# IMPORTANT: Add to tree BEFORE setting authority if possible, 
+	# but for MultiplayerSpawner, adding to tree triggers the spawn on clients.
 	players_node.add_child(player)
 	
-	# Initial data sync
+	# Set authority so it replicates to clients correctly
+	player.set_multiplayer_authority(id)
+	
+	print("[WorldManager] SERVER: Spawned player node for ", id, " in Players container.")
+	
+	# Initial data sync (pushed via MultiplayerSynchronizer automatically)
 	var peer_info = NetworkManager.get_player_data(id)
 	if not peer_info.is_empty() and "sync_custom_data" in player:
 		player.sync_custom_data = peer_info
 
-	var spawn_pos = PlayerData.last_position if id == 1 else Vector3(0, 1, 0)
+	# Only overwrite global_position if we have a valid last_position or spawn marker
+	if PlayerData.last_position != Vector3.ZERO and id == 1:
+		player.global_position = PlayerData.last_position
+		print("[WorldManager] Player ", id, " restored to last position: ", PlayerData.last_position)
+	else:
+		# Keep the safe high-spawn position until terrain is ready
+		print("[WorldManager] Player ", id, " initial safe spawn set to: ", player.global_position)
 	
-	# If this is a joining client, try to spawn them near the host so they aren't in the void
-	if id != 1:
-		var host = players_node.get_node_or_null("1") if players_node else get_node_or_null("1")
-		if host:
-			spawn_pos = host.global_position + Vector3(randf_range(-2,2), 0, randf_range(-2,2))
-	
-	player.global_position = spawn_pos
-	print("[WorldManager] Player ", id, " spawned at ", spawn_pos)
-	
-	if spawn_pos == Vector3.ZERO:
+	# Only use spawn markers if we aren't restoring a saved position and aren't the high-spawn client
+	if PlayerData.last_position == Vector3.ZERO or id != 1:
 		var spawns = get_tree().get_nodes_in_group("spawn_point")
-		if spawns.size() > 0:
-			spawn_pos = spawns[0].global_position
+		if spawns.size() > 0 and id == 1: # Only host uses spawn markers initially
+			player.global_position = spawns[0].global_position
+			print("[WorldManager] Player ", id, " moved to spawn marker: ", player.global_position)
+
+
+func spawn_simulated_peer() -> void:
+	var bot_id = 9000 + randi() % 1000
+	print("[WorldManager] Spawning simulated bot with ID: ", bot_id)
 	
-	player.global_position = spawn_pos
+	# Register bot data in NetworkManager
+	var bot_data = {
+		"name": "Bot_" + str(bot_id),
+		"appearance": {
+			"race": ["human", "elf", "orc"][randi() % 3],
+			"gender": ["male", "female"][randi() % 2],
+			"skin_color": Color(randf(), randf(), randf(), 1.0).to_html()
+		},
+		"class": "Warrior"
+	}
+	NetworkManager.peer_data[bot_id] = bot_data
 	
-	# We no longer push authority from server to client here
-	# because the client might not have spawned the node yet.
-	# The client will request authority in its own _ready() via RPC.
+	_spawn_player_multi(bot_id)
+	
+	# Position the bot near the local player and ACTIVATE AI
+	var players_node = get_node_or_null("Players")
+	if players_node and players_node.has_node(str(bot_id)):
+		var bot_node = players_node.get_node(str(bot_id))
+		bot_node.is_simulated = true
+		
+		var local_player = get_tree().get_first_node_in_group("local_player")
+		if local_player:
+			bot_node.ai_target = local_player
+			bot_node.global_position = local_player.global_position + Vector3(randf_range(-3,3), 0, randf_range(-3,3))
+			print("[WorldManager] Bot AI activated near local player.")
 
 func _despawn_player(id: int) -> void:
 	var p = get_node_or_null(str(id))
@@ -277,8 +342,11 @@ func request_client_authority(path: NodePath) -> void:
 		# Tell the client we've assigned it
 		confirm_client_authority.rpc_id(id, path)
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func confirm_client_authority(path: NodePath) -> void:
+	var sender_id = multiplayer.get_remote_sender_id()
+	if sender_id != 0 and not multiplayer.is_server() and sender_id != 1:
+		return
 	var player = get_node_or_null(path)
 	if player and player.has_method("setup_as_local"):
 		player.setup_as_local()
